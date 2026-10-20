@@ -8,7 +8,7 @@
 // @match        *://*.arena.ai/*
 // @match        *://*.canaryarena.ai/*
 // @match        *://chat.lmsys.org/*
-// @match        *://arena.ai
+// @match        https://arena.ai
 // @icon         https://arena.ai/favicon.ico
 // @grant        GM_getValue
 // @grant        GM_setValue
