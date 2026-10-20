@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Arena.ai | DOM Performance Optimizer
 // @namespace    https://greasyfork.org/en/users/1462137-piknockyou
-// @version      2.5.0
+// @version      3.0.0
 // @author       Piknockyou (vibe-coded)
 // @license      AGPL-3.0
 // @description  Fixes sluggish scrolling in Arena by virtualizing old messages, flattening 30k+ node Shiki codeblocks, neutralizing CSS blurs/transitions, and optionally keeping thinking blocks expanded.
@@ -33,22 +33,17 @@
 		autoClean: true,
 		autoCleanDelay: 1000,
 		showToolbar: true,
-		keepThinkingExpanded: false, // NEW: force-open reasoning/thinking blocks
+		keepThinkingExpanded: false,
 	};
 
 	function getConfig() {
 		const stored = GM_getValue("arenaPerfConfigDOM", null);
 		if (stored) {
-			try {
-				return { ...DEFAULT_CONFIG, ...JSON.parse(stored) };
-			} catch (_e) {}
+			try { return { ...DEFAULT_CONFIG, ...JSON.parse(stored) }; } catch (_e) {}
 		}
 		return { ...DEFAULT_CONFIG };
 	}
-
-	function saveConfig(cfg) {
-		GM_setValue("arenaPerfConfigDOM", JSON.stringify(cfg));
-	}
+	function saveConfig(cfg) { GM_setValue("arenaPerfConfigDOM", JSON.stringify(cfg)); }
 
 	const config = getConfig();
 
@@ -56,21 +51,14 @@
 	// CONSTANTS
 	// ═══════════════════════════════════════════════════════════════════
 	const SURGEON_ID = "arena-perf-surgeon";
-	const PAUSED_CLASS = "arena-perf-paused";
-
-	function hideNth() {
-		return config.visibleMessages + 2;
-	}
+	const LOG_SELECTOR = '[role="log"]';
 
 	// ⚡ INSTANT CSS INJECTION (before body exists)
+	// NOTE: we no longer do CSS-based message hiding — the JS virtualizer is
+	// the single source of truth (role=log + flex-col makes CSS thresholds
+	// fragile). The flash window is tiny because chat hydrates after JS runs.
 	try {
-		const nth = hideNth();
-		let css = `
-			body:not(.${PAUSED_CLASS}) ol.flex-col-reverse > div:nth-child(n+${nth}),
-			body:not(.${PAUSED_CLASS}) ol.flex-col-reverse > li:nth-child(n+${nth}) {
-				display: none !important;
-			}
-		`;
+		let css = "";
 		if (config.killTransitions)
 			css += `*, *::before, *::after { transition: none !important; animation-duration: 0s !important; }`;
 		if (config.killBlurs)
@@ -97,15 +85,7 @@
 	// MODULE A — CSS SURGEON
 	// ═══════════════════════════════════════════════════════════════════
 	function buildSurgeonCSS() {
-		const nth = hideNth();
-		let css = `/* ── Arena Perf: Base ── */\n`;
-
-		css += `
-			body:not(.${PAUSED_CLASS}) ol.flex-col-reverse > div:nth-child(n+${nth}),
-			body:not(.${PAUSED_CLASS}) ol.flex-col-reverse > li:nth-child(n+${nth}) {
-				display: none !important;
-			}
-		`;
+		let css = `/* ── Arena Perf v3 ── */\n`;
 
 		if (config.killTransitions) {
 			css += `
@@ -115,7 +95,7 @@
 					animation-duration: 0s !important;
 				}
 				[class*="transition-[max-height]"] { transition: none !important; }
-				[class*="overflow-"], [class*="scroller"], [data-radix-scroll-area-viewport] {
+				${LOG_SELECTOR}, [class*="overflow-"], [class*="scroller"] {
 					scroll-behavior: auto !important;
 				}
 			`;
@@ -127,16 +107,13 @@
 					backdrop-filter: none !important;
 					-webkit-backdrop-filter: none !important;
 				}
-				.bg-white\\/50 { background-color: rgba(255,255,255,0.95) !important; }
-				.bg-black\\/50 { background-color: rgba(0,0,0,0.95) !important; }
 			`;
 		}
 
 		if (config.addContainment) {
 			css += `
-				[data-radix-scroll-area-viewport] { contain: layout paint; }
-				ol.flex-col-reverse > div { contain: content; }
-				pre, code, [class*="prose"] { contain: content; }
+				${LOG_SELECTOR} > * { contain: layout style; }
+				pre, code, [class*="prose"] { contain: layout style; }
 			`;
 		}
 
@@ -154,21 +131,41 @@
 	}
 
 	// ═══════════════════════════════════════════════════════════════════
-	// MODULE B — DOM VIRTUALIZER & FLATTENER
+	// MODULE B — MESSAGE CONTAINER / NODE HELPERS
 	// ═══════════════════════════════════════════════════════════════════
+
+	// Diagnostic confirmed the chat container is [role="log"].
+	// There's typically only one, but defensive: pick the one with the most children.
 	function getMessageContainer() {
-		return document.querySelector("ol.flex-col-reverse");
+		const logs = document.querySelectorAll(LOG_SELECTOR);
+		if (logs.length === 0) return null;
+		if (logs.length === 1) return logs[0];
+		let best = logs[0];
+		for (const el of logs) if (el.children.length > best.children.length) best = el;
+		return best;
 	}
 
+	// Container class tells us ordering:
+	//   flex-col-reverse → index 0 is newest (old layout)
+	//   flex-col         → last index is newest (current layout)
+	function isReversed(container) {
+		if (!container) return false;
+		const cls = typeof container.className === "string" ? container.className : "";
+		return /\bflex-col-reverse\b/.test(cls);
+	}
+
+	// Filter direct children that are actual messages (skip spacers, hidden, empty wrappers)
 	function getMessages(container) {
 		if (!container) return [];
 		return Array.from(container.children).filter((el) => {
-			const isMsg = el.tagName === "DIV" || el.tagName === "LI";
-			const isNotSpacer = !el.classList.contains("h-0");
-			return isMsg && isNotSpacer;
+			if (!(el instanceof HTMLElement)) return false;
+			if (el.classList.contains("h-0")) return false;
+			if (el.hidden) return false;
+			return true;
 		});
 	}
 
+	// Strips Shiki <span> tags from code blocks in a message (perf win).
 	function flattenShikiBlocks(msgNode) {
 		if (!config.flattenCodeblocks) return 0;
 		let flattened = 0;
@@ -196,8 +193,9 @@
 	// ═══════════════════════════════════════════════════════════════════
 	// MODULE B2 — THINKING / REASONING BLOCK EXPANDER
 	// ═══════════════════════════════════════════════════════════════════
-	// Matches trigger text like "Thinking…", "Thought for 8s", "Reasoning",
-	// "Show thinking", "Hide thinking". Will NOT match "Show more", "Load more", etc.
+	// Diagnostic confirmed trigger shape:
+	//   <button data-state="closed" aria-expanded="false">Thought for 14 seconds</button>
+	// Content sibling has data-state="closed" too (Radix Collapsible).
 	const THINKING_RE = /\b(?:think|thought|reason|chain[-\s]of[-\s]thought)/i;
 
 	function isThinkingTrigger(el) {
@@ -206,17 +204,9 @@
 		if (text && THINKING_RE.test(text)) return true;
 		const label = el.getAttribute("aria-label") || "";
 		if (label && THINKING_RE.test(label)) return true;
-		const cls = typeof el.className === "string" ? el.className : "";
-		if (cls && /think|reason/i.test(cls)) return true;
-		for (const a of ["data-testid", "data-test-id", "data-slot"]) {
-			const v = el.getAttribute(a) || "";
-			if (v && THINKING_RE.test(v)) return true;
-		}
 		return false;
 	}
 
-	// Scans a single message node and expands any collapsed thinking blocks.
-	// Returns number of blocks expanded.
 	function expandThinkingInNode(root) {
 		if (!root) return 0;
 		let count = 0;
@@ -229,37 +219,40 @@
 			}
 		});
 
-		// 2. Radix Collapsible / aria-expanded toggles
-		const triggers = root.querySelectorAll(
-			'[data-radix-collapsible-trigger], button[aria-expanded], [data-state][role="button"]',
-		);
-		triggers.forEach((t) => {
-			const state = t.getAttribute("data-state");
-			const aria = t.getAttribute("aria-expanded");
-			// Already open → leave alone
-			if (state === "open" || aria === "true") return;
-			if (!isThinkingTrigger(t)) return;
-			try {
-				t.click();
-				count++;
-			} catch (_e) {}
+		// 2. Radix Collapsible triggers — diag shows data-state="closed" on the button
+		root.querySelectorAll('button[data-state="closed"]').forEach((btn) => {
+			if (isThinkingTrigger(btn)) {
+				try {
+					btn.click();
+					count++;
+				} catch (_e) {}
+			}
 		});
 
 		return count;
 	}
 
-	// Scans only the currently-visible messages (respects virtualization).
+	// Scans only currently-visible messages (respects virtualization).
 	function expandThinkingBlocks() {
 		if (!config.keepThinkingExpanded) return 0;
 		const container = getMessageContainer();
 		if (!container) return 0;
 
 		const msgs = getMessages(container);
-		const limit = isPaused ? msgs.length : config.visibleMessages;
-		const end = Math.min(limit, msgs.length);
+		const keep = isPaused ? msgs.length : config.visibleMessages;
+		const reversed = isReversed(container);
+
+		let start, end;
+		if (reversed) {
+			start = 0;
+			end = Math.min(keep, msgs.length);
+		} else {
+			start = Math.max(0, msgs.length - keep);
+			end = msgs.length;
+		}
 
 		let count = 0;
-		for (let i = 0; i < end; i++) {
+		for (let i = start; i < end; i++) {
 			count += expandThinkingInNode(msgs[i]);
 		}
 
@@ -290,30 +283,42 @@
 			stats.totalMsgs = msgs.length;
 
 			if (isPaused) {
-				stats.hiddenMsgs = Math.max(0, msgs.length - config.visibleMessages);
+				// Paused: show all, do not flatten (user is inspecting)
+				for (const m of msgs) {
+					if (m.style.display === "none") m.style.display = "";
+				}
+				stats.hiddenMsgs = 0;
 			} else {
+				const keep = config.visibleMessages;
+				const total = msgs.length;
+				const reversed = isReversed(container);
+
 				let hidden = 0;
 				let newFlattened = 0;
 
 				msgs.forEach((msg, index) => {
-					if (index >= config.visibleMessages) {
+					// Determine if this message is "newest" (kept visible)
+					const isNewest = reversed
+						? index < keep
+						: index >= total - keep;
+
+					if (isNewest) {
+						if (msg.style.display === "none") msg.style.display = "";
+					} else {
 						newFlattened += flattenShikiBlocks(msg);
+						if (msg.style.display !== "none") msg.style.display = "none";
 						hidden++;
 					}
-					if (msg.style.display === "none") msg.style.display = "";
 				});
 
 				stats.hiddenMsgs = hidden;
 				stats.nodesFlattened += newFlattened;
 
 				if (newFlattened > 0) {
-					console.log(
-						`[ArenaPerf] Flattened ${newFlattened} codeblocks in hidden messages.`,
-					);
+					console.log(`[ArenaPerf] Flattened ${newFlattened} codeblocks in hidden messages.`);
 				}
 			}
 
-			// NEW: expand thinking blocks on visible messages
 			if (config.keepThinkingExpanded) expandThinkingBlocks();
 		} finally {
 			startObserver();
@@ -323,8 +328,7 @@
 
 	function setPaused(paused) {
 		isPaused = paused;
-		if (document.body) document.body.classList.toggle(PAUSED_CLASS, paused);
-		if (!paused) cleanMessages();
+		cleanMessages(true); // always run so pause state is applied immediately
 		if (config.keepThinkingExpanded) expandThinkingBlocks();
 		updateToolbar();
 	}
@@ -456,63 +460,34 @@
 		}
 
 		const head = document.createElement("div");
-		head.style.cssText =
-			"font-weight:bold; font-size:14px; margin-bottom:4px; text-align:center;";
+		head.style.cssText = "font-weight:bold; font-size:14px; margin-bottom:4px; text-align:center;";
 		head.textContent = "DOM Optimizer Settings";
 		panel.appendChild(head);
 
-		addToggle(
-			"⚡",
-			"Kill Transitions",
-			() => config.killTransitions,
-			() => {
-				config.killTransitions = !config.killTransitions;
-				applySurgeryCSS();
-			},
-		);
+		addToggle("⚡", "Kill Transitions", () => config.killTransitions, () => {
+			config.killTransitions = !config.killTransitions;
+			applySurgeryCSS();
+		});
 
-		addToggle(
-			"🌫️",
-			"Kill GPU Blurs",
-			() => config.killBlurs,
-			() => {
-				config.killBlurs = !config.killBlurs;
-				applySurgeryCSS();
-			},
-		);
+		addToggle("🌫️", "Kill GPU Blurs", () => config.killBlurs, () => {
+			config.killBlurs = !config.killBlurs;
+			applySurgeryCSS();
+		});
 
-		addToggle(
-			"🔥",
-			"Flatten Shiki Spans",
-			() => config.flattenCodeblocks,
-			() => {
-				config.flattenCodeblocks = !config.flattenCodeblocks;
-				if (config.flattenCodeblocks) cleanMessages();
-			},
-		);
+		addToggle("🔥", "Flatten Shiki Spans", () => config.flattenCodeblocks, () => {
+			config.flattenCodeblocks = !config.flattenCodeblocks;
+			if (config.flattenCodeblocks) cleanMessages(true);
+		});
 
-		addToggle(
-			"📦",
-			"CSS Containment",
-			() => config.addContainment,
-			() => {
-				config.addContainment = !config.addContainment;
-				applySurgeryCSS();
-			},
-		);
+		addToggle("📦", "CSS Containment", () => config.addContainment, () => {
+			config.addContainment = !config.addContainment;
+			applySurgeryCSS();
+		});
 
-		// ── NEW: Keep Thinking Expanded ──
-		const thinkRow = addToggle(
-			"🧠",
-			"Keep Thinking Expanded",
-			() => config.keepThinkingExpanded,
-			() => {
-				config.keepThinkingExpanded = !config.keepThinkingExpanded;
-				if (config.keepThinkingExpanded) expandThinkingBlocks();
-			},
-		);
-		thinkRow.title =
-			"Force reasoning/thinking blocks to stay open. Overrides manual collapses.";
+		addToggle("🧠", "Keep Thinking Expanded", () => config.keepThinkingExpanded, () => {
+			config.keepThinkingExpanded = !config.keepThinkingExpanded;
+			if (config.keepThinkingExpanded) expandThinkingBlocks();
+		}).title = "Force reasoning/thinking blocks to stay open. Overrides manual collapses.";
 
 		panel.appendChild(document.createElement("hr"));
 
@@ -520,15 +495,11 @@
 		numRow.className = "perf-row";
 		numRow.innerHTML = `<span>📝 Visible Messages</span><span style="color:#60a5fa;font-weight:bold">${config.visibleMessages}</span>`;
 		numRow.addEventListener("click", () => {
-			const val = prompt(
-				"Number of recent messages to keep visible?",
-				config.visibleMessages,
-			);
+			const val = prompt("Number of recent messages to keep visible?", config.visibleMessages);
 			const num = parseInt(val, 10);
 			if (num && num > 0) {
 				config.visibleMessages = num;
 				saveConfig(config);
-				applySurgeryCSS();
 				cleanMessages(true);
 				panel.remove();
 				_settingsPopover = null;
@@ -564,55 +535,40 @@
 		if (observer) observer.disconnect();
 
 		observer = new MutationObserver((mutations) => {
+			const log = getMessageContainer();
+			if (!log) return;
+
 			let shouldClean = false;
 			let shouldExpand = false;
 
 			for (const m of mutations) {
-				if (m.type === "childList" && m.addedNodes.length > 0) {
-					if (
-						m.target instanceof Element &&
-						m.target.matches("ol.flex-col-reverse")
-					) {
+				if (m.type === "childList") {
+					// A message list change: additions/removals directly on the log
+					if (m.target === log && (m.addedNodes.length > 0 || m.removedNodes.length > 0)) {
 						shouldClean = true;
 						shouldExpand = true;
-					} else {
-						for (const node of m.addedNodes) {
-							if (
-								node.nodeType !== 1 ||
-								typeof node.querySelector !== "function"
-							)
-								continue;
-							if (
-								node.matches?.("ol.flex-col-reverse") ||
-								node.querySelector("ol.flex-col-reverse")
-							) {
-								shouldClean = true;
-								shouldExpand = true;
-								break;
-							}
+						continue;
+					}
+					// Container swap (SPA nav replaces role=log itself)
+					for (const node of m.addedNodes) {
+						if (node instanceof Element && node.matches && node.matches(LOG_SELECTOR)) {
+							shouldClean = true;
+							break;
 						}
 					}
-				} else if (
-					m.type === "attributes" &&
-					config.keepThinkingExpanded
-				) {
-					// A thinking block collapsed (or was collapsed by Arena) → re-expand
+				} else if (m.type === "attributes" && config.keepThinkingExpanded) {
+					// A thinking block collapsed → re-expand
 					const t = m.target;
 					if (!(t instanceof Element)) continue;
+					if (!log.contains(t)) continue;
 					const state = t.getAttribute("data-state");
 					const aria = t.getAttribute("aria-expanded");
-					if (
-						(state === "closed" || aria === "false") &&
-						isThinkingTrigger(t)
-					) {
-						shouldExpand = true;
-					} else if (
-						t.tagName === "DETAILS" &&
-						!t.open &&
-						isThinkingTrigger(t.querySelector("summary") || t)
-					) {
-						shouldExpand = true;
-					}
+					const isClosed =
+						state === "closed" ||
+						aria === "false" ||
+						(t.tagName === "DETAILS" && !t.open);
+					if (!isClosed) continue;
+					if (isThinkingTrigger(t)) shouldExpand = true;
 				}
 			}
 
@@ -624,7 +580,7 @@
 			childList: true,
 			subtree: true,
 			attributes: true,
-			attributeFilter: ["data-state", "aria-expanded", "open", "hidden"],
+			attributeFilter: ["data-state", "aria-expanded", "open"],
 		});
 	}
 
@@ -634,21 +590,30 @@
 			console.log("[ArenaPerf] Deferring init until tab is visible");
 			return;
 		}
-
 		if (hasStarted) return;
 		hasStarted = true;
 
-		console.log("[ArenaPerf] Booting DOM Virtualizer & Flattener...");
+		console.log("[ArenaPerf] Booting DOM Virtualizer v3...");
 		applySurgeryCSS();
 		if (config.showToolbar) createToolbar();
 		startObserver();
 
-		setTimeout(cleanMessages, 1000);
-		setTimeout(cleanMessages, 3000);
+		setTimeout(() => cleanMessages(true), 500);
+		setTimeout(() => cleanMessages(true), 2000);
 		if (config.keepThinkingExpanded) {
-			setTimeout(expandThinkingBlocks, 1200);
-			setTimeout(expandThinkingBlocks, 3200);
+			setTimeout(expandThinkingBlocks, 800);
+			setTimeout(expandThinkingBlocks, 2500);
 		}
+
+		// Safety poll: catches anything the observer misses
+		// (e.g. if messages turn out NOT to be direct children of role=log)
+		setInterval(() => {
+			if (isPaused || !config.autoClean) return;
+			const container = getMessageContainer();
+			if (!container) return;
+			const count = getMessages(container).length;
+			if (count !== stats.totalMsgs) cleanMessages(true);
+		}, 3000);
 	}
 
 	function scheduleInit() {
@@ -656,11 +621,8 @@
 			pendingStart = true;
 			return;
 		}
-
 		if (window.requestIdleCallback) {
-			const idleId = window.requestIdleCallback(initializeUI, {
-				timeout: 1000,
-			});
+			const idleId = window.requestIdleCallback(initializeUI, { timeout: 1000 });
 			setTimeout(() => {
 				if (!hasStarted) {
 					window.cancelIdleCallback(idleId);
@@ -672,40 +634,37 @@
 		}
 	}
 
-	function waitForReady() {
-		const READY_SELECTOR = "form textarea";
+	// Diagnostic confirmed: no form/textarea exists. [role=log] is the ready marker.
+	function isAppReady() {
+		return !!document.querySelector(LOG_SELECTOR);
+	}
 
-		if (document.querySelector(READY_SELECTOR)) {
+	function waitForReady() {
+		if (isAppReady()) {
 			scheduleInit();
 			return;
 		}
-
 		const readyObserver = new MutationObserver(() => {
-			if (document.querySelector(READY_SELECTOR)) {
+			if (isAppReady()) {
 				readyObserver.disconnect();
 				setTimeout(scheduleInit, 200);
 			}
 		});
-
 		readyObserver.observe(document.body, { childList: true, subtree: true });
 	}
 
 	document.addEventListener("visibilitychange", () => {
 		if (document.visibilityState !== "visible") return;
-
 		if (pendingStart && !hasStarted) {
 			pendingStart = false;
 			setTimeout(initializeUI, 250);
 		}
 	});
 
+	// Emergency init: if [role=log] never appears (empty chat / different page), still start
 	setTimeout(() => {
-		if (document.visibilityState !== "visible") {
-			pendingStart = true;
-			return;
-		}
-		if (!hasStarted && document.querySelector("form textarea")) {
-			console.warn("[ArenaPerf] Emergency init after 5s");
+		if (!hasStarted) {
+			console.warn("[ArenaPerf] Emergency init after 5s (role=log not found)");
 			initializeUI();
 		}
 	}, 5000);
