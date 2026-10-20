@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Arena.ai | Coding Edition
 // @namespace    https://greasyfork.org/en/users/1462137-piknockyou
-// @version      3.1.0
+// @version      3.2.0
 // @author       Piknockyou (vibe-coded)
 // @license      AGPL-3.0
-// @description  Virtualizes old messages, strips heavy CSS, auto-scrolls, collapses old thinking, shows token stats, and adds action buttons (PR / merge / clear / hide composer) in a slide-out drawer. Export as Markdown.
+// @description  Virtualizes old messages, strips heavy CSS, auto-scrolls, collapses old thinking, shows token stats, and sends agent actions (PR/merge/clear) through the composer. Export as Markdown.
 // @match        *://*.arena.ai/*
 // @match        *://*.canaryarena.ai/*
 // @match        *://chat.lmsys.org/*
@@ -29,6 +29,7 @@
 		showExport: true,
 		contextWindow: 200000,
 		hideComposer: false,
+		composerSelector: "",
 	};
 
 	let cfg = { ...DEFAULTS };
@@ -57,13 +58,34 @@
 				-webkit-backdrop-filter: none !important;
 			}
 			[data-cc-hidden="1"] { display: none !important; }
-			html[data-cc-hide-composer="1"] [data-cc-composer="1"] { display: none !important; }
 		`;
 	}
 	injectPerfCSS();
 
 	// ═══════════════════════════════════════════════════════════════════
-	// DOM HELPERS
+	// TOAST
+	// ═══════════════════════════════════════════════════════════════════
+	function toast(msg, kind = "info", ms = 3000) {
+		const t = document.createElement("div");
+		t.textContent = msg;
+		t.style.cssText = `
+			position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+			padding: 10px 18px; border-radius: 8px;
+			font: 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+			color: #fff; z-index: 2147483647;
+			box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+			background: #333; opacity: 0; transition: opacity 0.2s ease;
+			max-width: 80vw; text-align: center; line-height: 1.4;
+		`;
+		if (kind === "error") t.style.background = "#c62828";
+		if (kind === "success") t.style.background = "#2e7d32";
+		document.body.appendChild(t);
+		requestAnimationFrame(() => { t.style.opacity = "1"; });
+		setTimeout(() => { t.style.opacity = "0"; setTimeout(() => t.remove(), 300); }, ms);
+	}
+
+	// ═══════════════════════════════════════════════════════════════════
+	// DOM: container + messages
 	// ═══════════════════════════════════════════════════════════════════
 	const LOG_SELECTOR = '[role="log"]';
 
@@ -79,44 +101,153 @@
 		return /\bflex-col-reverse\b/.test(container.className || "");
 	}
 
+	function isMsgNode(el) {
+		if (!(el instanceof HTMLElement)) return false;
+		if (el.classList.contains("h-0")) return false;
+		if (el.hidden) return false;
+		return true;
+	}
+
+	// Detect: if direct children don't look like messages, dig one level.
 	function getMessages(container) {
 		if (!container) return [];
-		return Array.from(container.children).filter((el) => {
-			if (!(el instanceof HTMLElement)) return false;
-			if (el.classList.contains("h-0")) return false;
-			if (el.hidden) return false;
-			return true;
+		const direct = Array.from(container.children).filter(isMsgNode);
+
+		const looksLikeMsgs = direct.some((el) => {
+			const txt = (el.textContent || "").trim();
+			return (
+				txt.length > 30 ||
+				el.querySelector("pre, .prose, [class*='prose'], button[data-state]")
+			);
 		});
+
+		if (direct.length >= 2 && looksLikeMsgs) return direct;
+
+		// Try one level deeper
+		for (const child of direct) {
+			const nested = Array.from(child.children).filter(isMsgNode);
+			if (nested.length >= 2) return nested;
+		}
+		return direct;
 	}
 
 	// ═══════════════════════════════════════════════════════════════════
-	// TOAST
+	// COMPOSER FINDER (robust, scored)
 	// ═══════════════════════════════════════════════════════════════════
-	function toast(msg, kind = "info") {
-		const t = document.createElement("div");
-		t.textContent = msg;
-		t.style.cssText = `
-			position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
-			padding: 10px 18px; border-radius: 8px;
-			font: 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-			color: #fff; z-index: 2147483647;
-			box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-			background: #333;
-			opacity: 0; transition: opacity 0.2s ease;
-			max-width: 80vw; text-align: center;
-		`;
-		if (kind === "error") t.style.background = "#c62828";
-		if (kind === "success") t.style.background = "#2e7d32";
-		document.body.appendChild(t);
-		requestAnimationFrame(() => { t.style.opacity = "1"; });
+	function findComposer() {
+		// Manual override
+		if (cfg.composerSelector) {
+			try {
+				const el = document.querySelector(cfg.composerSelector);
+				if (el) return el;
+			} catch (_) {}
+		}
+
+		const candidates = [];
+		const all = document.querySelectorAll(
+			'textarea, input[type="text"], input:not([type]), [contenteditable="true"], [contenteditable=""], [contenteditable], [role="textbox"], [role="combobox"]'
+		);
+
+		for (const el of all) {
+			if (el.matches(".g-recaptcha-response")) continue;
+			if (el.getAttribute("aria-hidden") === "true") continue;
+			if (el.disabled) continue;
+			if (el.readOnly) continue;
+
+			const r = el.getBoundingClientRect();
+			if (r.width < 60 || r.height < 14) continue;
+			if (r.bottom < 0 || r.top > window.innerHeight) continue;
+
+			let score = 0;
+			// Strong preference: bottom half of viewport (chat composer)
+			if (r.top > window.innerHeight * 0.4) score += 20;
+			if (r.top > window.innerHeight * 0.6) score += 10;
+			// Wide = multi-line composer
+			if (r.width > 200) score += 10;
+			if (r.width > 400) score += 5;
+			// Actual textarea is preferred over input
+			if (el.tagName === "TEXTAREA") score += 8;
+			if (el.isContentEditable) score += 6;
+			// Not in header/nav
+			if (!el.closest("header, [role='banner'], nav, aside")) score += 10;
+			// Not inside role=log (messages contain no editor)
+			if (!el.closest('[role="log"]')) score += 15;
+
+			candidates.push({ el, score });
+		}
+
+		candidates.sort((a, b) => b.score - a.score);
+		return candidates[0]?.el || null;
+	}
+
+	function setComposerValue(input, text) {
+		input.focus();
+		if (input.tagName === "TEXTAREA" || input.tagName === "INPUT") {
+			const proto = input.tagName === "TEXTAREA"
+				? HTMLTextAreaElement.prototype
+				: HTMLInputElement.prototype;
+			const setter = Object.getOwnPropertyDescriptor(proto, "value").set;
+			setter.call(input, text);
+			input.dispatchEvent(new Event("input", { bubbles: true }));
+			input.dispatchEvent(new Event("change", { bubbles: true }));
+		} else if (input.isContentEditable) {
+			input.innerText = text;
+			input.dispatchEvent(new InputEvent("input", { bubbles: true, data: text }));
+		}
+	}
+
+	function submitComposer(input) {
 		setTimeout(() => {
-			t.style.opacity = "0";
-			setTimeout(() => t.remove(), 300);
-		}, 2600);
+			const opts = { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true };
+			input.dispatchEvent(new KeyboardEvent("keydown", opts));
+			input.dispatchEvent(new KeyboardEvent("keypress", opts));
+			input.dispatchEvent(new KeyboardEvent("keyup", opts));
+
+			// Also try a send button near the input
+			setTimeout(() => {
+				const r = input.getBoundingClientRect();
+				const sendSelectors = [
+					'button[aria-label*="send" i]',
+					'button[data-testid*="send" i]',
+					'button[type="submit"]',
+				];
+				for (const sel of sendSelectors) {
+					const btn = document.querySelector(sel);
+					if (btn && btn.getBoundingClientRect().width > 0) {
+						btn.click();
+						return;
+					}
+				}
+				// Fallback: button near input
+				const buttons = document.querySelectorAll("button");
+				for (const btn of buttons) {
+					const br = btn.getBoundingClientRect();
+					if (Math.abs(br.bottom - r.bottom) < 60 && br.left >= r.right - 60 && br.width > 0) {
+						btn.click();
+						return;
+					}
+				}
+			}, 120);
+		}, 60);
+	}
+
+	function sendAgentMessage(text) {
+		const input = findComposer();
+		if (!input) return false;
+		setComposerValue(input, text);
+		submitComposer(input);
+		return true;
+	}
+
+	async function copyText(text) {
+		try {
+			await navigator.clipboard.writeText(text);
+			return true;
+		} catch (_) { return false; }
 	}
 
 	// ═══════════════════════════════════════════════════════════════════
-	// VIRTUALIZATION
+	// VIRTUALIZE
 	// ═══════════════════════════════════════════════════════════════════
 	function flattenShiki(msg) {
 		if (!cfg.flattenCode) return 0;
@@ -224,7 +355,7 @@
 	}
 
 	// ═══════════════════════════════════════════════════════════════════
-	// MARKDOWN EXPORT
+	// MARKDOWN
 	// ═══════════════════════════════════════════════════════════════════
 	function htmlToMarkdown(root) {
 		const out = [];
@@ -245,10 +376,7 @@
 			}
 			if (tag === "code") { out.push("`" + (node.textContent || "") + "`"); return; }
 			if (tag === "br") { out.push("\n"); return; }
-			if (/^h[1-6]$/.test(tag)) {
-				out.push("\n" + "#".repeat(Number(tag[1])) + " ");
-				node.childNodes.forEach(walk); out.push("\n\n"); return;
-			}
+			if (/^h[1-6]$/.test(tag)) { out.push("\n" + "#".repeat(Number(tag[1])) + " "); node.childNodes.forEach(walk); out.push("\n\n"); return; }
 			if (tag === "strong" || tag === "b") { out.push("**"); node.childNodes.forEach(walk); out.push("**"); return; }
 			if (tag === "em" || tag === "i") { out.push("*"); node.childNodes.forEach(walk); out.push("*"); return; }
 			if (tag === "a") { const href = node.getAttribute("href") || ""; out.push("["); node.childNodes.forEach(walk); out.push(`](${href})`); return; }
@@ -291,65 +419,136 @@
 		a.download = `${pageTitle.replace(/[^\w.-]+/g, "-")}-${date}.md`;
 		document.body.appendChild(a); a.click(); a.remove();
 		setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-		toast("Exported " + ordered.length + " messages.", "success");
+		toast(`Exported ${ordered.length} messages.`, "success");
 	}
 
 	// ═══════════════════════════════════════════════════════════════════
-	// COMPOSER (find / hide / show)
+	// ACTIONS (rewritten to use composer, not nonexistent buttons)
 	// ═══════════════════════════════════════════════════════════════════
-	function findComposerInput() {
-		const selectors = [
-			'form textarea:not(.g-recaptcha-response)',
-			'textarea:not(.g-recaptcha-response)',
-			'[contenteditable="true"]:not([role="log"] *)',
-			'[role="textbox"]:not([role="log"] *)',
-			'input[type="text"]:not(.g-recaptcha-response)',
-			'input:not([type]):not(.g-recaptcha-response)',
-		];
-		for (const sel of selectors) {
-			const els = document.querySelectorAll(sel);
-			for (const el of els) {
+	async function actionCreatePR() {
+		const msg = "Create a pull request for the current changes and give me the PR URL.";
+		if (sendAgentMessage(msg)) toast("Sent to agent: create PR.", "success");
+		else {
+			const copied = await copyText(msg);
+			toast(copied ? "Composer not found — message copied. Paste into chat." : "Composer not found. Type: " + msg, "error", 5000);
+		}
+	}
+
+	async function actionMerge() {
+		const msg = "Merge the current pull request into the main branch.";
+		if (sendAgentMessage(msg)) toast("Sent to agent: merge.", "success");
+		else {
+			const copied = await copyText(msg);
+			toast(copied ? "Composer not found — message copied. Paste into chat." : "Composer not found. Type: " + msg, "error", 5000);
+		}
+	}
+
+	function actionClearChat() {
+		// Strategy 1: find a "new chat"/"+" button anywhere visible
+		const patterns = ["new chat", "new conversation", "start new", "clear chat", "reset chat", "plus", "compose"];
+		const buttons = document.querySelectorAll('button, [role="button"], a');
+		for (const el of buttons) {
+			const txt = ((el.textContent || "") + " " + (el.getAttribute("aria-label") || "") + " " + (el.getAttribute("data-testid") || "") + " " + (el.getAttribute("title") || "")).trim().toLowerCase();
+			if (!txt) continue;
+			if (patterns.some(p => txt.includes(p))) {
 				const r = el.getBoundingClientRect();
-				if (r.width > 40 && r.height > 12) return el;
+				if (r.width === 0 || r.height === 0) continue;
+				el.click();
+				toast(`Clicked "${(el.textContent || "").trim().slice(0, 30) || "new chat"}".`, "success");
+				return;
 			}
 		}
-		// Fallback: bottom-of-viewport input
-		const all = document.querySelectorAll('textarea:not(.g-recaptcha-response), [contenteditable="true"], input[type="text"], [role="textbox"]');
-		for (const el of all) {
+		// Fallback: navigate
+		if (confirm("Could not find a 'New chat' button. Navigate to a fresh chat? (Current conversation will be left.)")) {
+			location.href = "/";
+		}
+	}
+
+	async function actionDiagnostics() {
+		const out = [];
+		out.push("=== Coding Edition Diagnostics ===");
+		out.push(`URL: ${location.href}`);
+		out.push(`Viewport: ${window.innerWidth}x${window.innerHeight}`);
+
+		const container = getContainer();
+		out.push(`\n--- Container ---`);
+		if (container) {
+			out.push(`FOUND: <${container.tagName.toLowerCase()}> .${container.className}`);
+			out.push(`  children: ${container.children.length}`);
+			const msgs = getMessages(container);
+			out.push(`  messages detected: ${msgs.length}`);
+			if (msgs[0]) {
+				const m = msgs[0];
+				const txt = (m.textContent || "").trim().slice(0, 80);
+				out.push(`  first msg: <${m.tagName.toLowerCase()}> text="${txt}..."`);
+			}
+		} else {
+			out.push("NOT FOUND — no [role=log] on page.");
+		}
+
+		out.push(`\n--- Composer ---`);
+		const input = findComposer();
+		if (input) {
+			const r = input.getBoundingClientRect();
+			out.push(`FOUND: <${input.tagName.toLowerCase()}>`);
+			out.push(`  id="${input.id}" class="${input.className}"`);
+			out.push(`  rect: x=${r.x.toFixed(0)} y=${r.top.toFixed(0)} w=${r.width.toFixed(0)} h=${r.height.toFixed(0)}`);
+			out.push(`  contentEditable=${input.isContentEditable}`);
+		} else {
+			out.push("NOT FOUND — no matching input found in viewport.");
+			out.push("  Candidates seen:");
+			document.querySelectorAll('textarea, [contenteditable], [role="textbox"], input').forEach(el => {
+				const r = el.getBoundingClientRect();
+				out.push(`    <${el.tagName.toLowerCase()}> class="${el.className}" w=${r.width.toFixed(0)} h=${r.height.toFixed(0)}`);
+			});
+		}
+
+		out.push(`\n--- Visible buttons ---`);
+		const btnData = [];
+		document.querySelectorAll('button, [role="button"]').forEach(el => {
 			const r = el.getBoundingClientRect();
-			if (r.width > 40 && r.height > 12 && r.top > window.innerHeight * 0.55) return el;
-		}
-		return null;
+			if (r.width === 0 || r.height === 0) return;
+			if (r.top < 0 || r.top > window.innerHeight) return;
+			const text = (el.textContent || "").trim().slice(0, 30);
+			const aria = el.getAttribute("aria-label") || "";
+			const testid = el.getAttribute("data-testid") || "";
+			btnData.push(`  <button> text="${text}" aria="${aria}" testid="${testid}"`);
+		});
+		out.push(btnData.join("\n") || "  (none visible)");
+
+		const text = out.join("\n");
+		console.log(text);
+		await copyText(text);
+		toast("Diagnostics logged to console + copied to clipboard.", "success", 3500);
 	}
 
-	function findComposerWrapper() {
-		const input = findComposerInput();
-		if (!input) return null;
-
-		// Prefer a form ancestor if present
-		const form = input.closest("form");
-		if (form) return form;
-
-		// Otherwise walk up a small number of levels, stopping before we get too big
-		let wrapper = input;
-		for (let i = 0; i < 6; i++) {
-			if (!wrapper.parentElement || wrapper.parentElement === document.body) break;
-			const parent = wrapper.parentElement;
-			const pr = parent.getBoundingClientRect();
-			if (pr.height > window.innerHeight * 0.5) break;
-			wrapper = parent;
-		}
-		return wrapper;
-	}
-
+	// ═══════════════════════════════════════════════════════════════════
+	// COMPOSER VISIBILITY
+	// ═══════════════════════════════════════════════════════════════════
 	function applyComposerVisibility() {
-		const hide = !!cfg.hideComposer;
-		document.documentElement.toggleAttribute("data-cc-hide-composer", hide);
-		// Clear old markers
-		document.querySelectorAll('[data-cc-composer="1"]').forEach((el) => el.removeAttribute("data-cc-composer"));
-		if (!hide) return;
-		const wrapper = findComposerWrapper();
-		if (wrapper) wrapper.setAttribute("data-cc-composer", "1");
+		// Clear previous markers
+		document.querySelectorAll('[data-cc-composer-hide="1"]').forEach(el => {
+			el.style.removeProperty("display");
+			el.removeAttribute("data-cc-composer-hide");
+		});
+
+		if (!cfg.hideComposer) return;
+
+		const input = findComposer();
+		if (!input) return;
+
+		// Walk up to a wrapper that's ~viewport width but < 50% tall
+		let target = input;
+		for (let i = 0; i < 8; i++) {
+			const p = target.parentElement;
+			if (!p || p === document.body) break;
+			const pr = p.getBoundingClientRect();
+			if (pr.height > window.innerHeight * 0.5) break;
+			if (pr.width < 200) break;
+			target = p;
+		}
+		target.style.setProperty("display", "none", "important");
+		target.setAttribute("data-cc-composer-hide", "1");
 	}
 
 	function toggleComposer() {
@@ -357,74 +556,22 @@
 		saveConfig();
 		applyComposerVisibility();
 		renderActiveTab();
-		toast(cfg.hideComposer ? "Entry panel hidden." : "Entry panel shown.", "success");
-	}
-
-	// ═══════════════════════════════════════════════════════════════════
-	// ARENA ACTION HELPERS
-	// ═══════════════════════════════════════════════════════════════════
-	function clickFirstMatching(patterns) {
-		const els = document.querySelectorAll('button, [role="button"], a');
-		for (const el of els) {
-			const txt = ((el.textContent || "") + " " + (el.getAttribute("aria-label") || "")).trim().toLowerCase();
-			if (!txt) continue;
-			const r = el.getBoundingClientRect();
-			if (r.width === 0 || r.height === 0) continue;
-			// Must be inside viewport-ish
-			if (r.bottom < 0 || r.top > window.innerHeight) continue;
-			for (const p of patterns) {
-				if (txt.includes(p.toLowerCase())) {
-					el.click();
-					return el;
-				}
-			}
-		}
-		return null;
-	}
-
-	function actionCreatePR() {
-		const patterns = [
-			"create pull request", "create pr", "open pull request", "open pr",
-			"submit pull request", "submit pr", "new pull request", "new pr",
-		];
-		const el = clickFirstMatching(patterns);
-		if (el) toast(`Clicked "${(el.textContent || "").trim().slice(0, 30)}".`, "success");
-		else toast("No 'Create PR' button visible. Open the workspace panel or ask the agent to create a PR.", "error");
-	}
-
-	function actionMerge() {
-		const patterns = [
-			"merge pull request", "merge pr", "merge changes",
-			"merge into main", "merge branch", "merge",
-		];
-		const el = clickFirstMatching(patterns);
-		if (el) toast(`Clicked "${(el.textContent || "").trim().slice(0, 30)}".`, "success");
-		else toast("No 'Merge' button visible. A PR may not exist yet.", "error");
-	}
-
-	function actionClearChat() {
-		const patterns = [
-			"new chat", "new conversation", "start new chat",
-			"clear chat", "reset chat", "delete chat",
-		];
-		const el = clickFirstMatching(patterns);
-		if (el) { toast("Started a new chat.", "success"); return; }
-		if (confirm("Could not find a 'New chat' button in the current view. Navigate to a fresh chat instead?")) {
-			location.href = "/";
+		if (cfg.hideComposer && !findComposer()) {
+			toast("Composer not detected — nothing to hide. Run Diagnostics to see why.", "error", 4000);
+		} else {
+			toast(cfg.hideComposer ? "Entry panel hidden." : "Entry panel shown.", "success");
 		}
 	}
 
 	// ═══════════════════════════════════════════════════════════════════
-	// FLOATING EXPORT BUTTON
+	// EXPORT BUTTON (floating)
 	// ═══════════════════════════════════════════════════════════════════
 	const EXPORT_ID = "cc-export-btn";
 	function injectExportButton() {
 		if (!cfg.showExport || document.getElementById(EXPORT_ID)) return;
 		const btn = document.createElement("button");
-		btn.id = EXPORT_ID; btn.textContent = "⬇ export.md"; btn.title = "Export chat as Markdown";
+		btn.id = EXPORT_ID; btn.textContent = "⬇ export.md";
 		btn.style.cssText = `position:fixed;right:20px;bottom:20px;z-index:2147483647;padding:8px 14px;background:#fff;color:#1a1a1a;border:1px solid #d4d4d4;border-radius:8px;font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.12);`;
-		btn.addEventListener("mouseenter", () => { btn.style.background = "#f5f5f5"; btn.style.borderColor = "#b0b0b0"; });
-		btn.addEventListener("mouseleave", () => { btn.style.background = "#fff"; btn.style.borderColor = "#d4d4d4"; });
 		btn.addEventListener("click", exportMarkdown);
 		document.body.appendChild(btn);
 	}
@@ -433,7 +580,7 @@
 	// ═══════════════════════════════════════════════════════════════════
 	// STATISTICS
 	// ═══════════════════════════════════════════════════════════════════
-	function estimateTokens(chars) { return Math.round(chars / 4); }
+	function estimateTokens(c) { return Math.round(c / 4); }
 	function fmtNum(n) {
 		if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
 		if (n >= 10_000) return (n / 1_000).toFixed(1) + "K";
@@ -481,8 +628,6 @@
 		if (!drawer || !toggle) return;
 		drawer.style.transform = drawerOpen ? "translateX(0)" : "translateX(-100%)";
 		toggle.innerHTML = drawerOpen ? CHEVRON_LEFT : CHEVRON_RIGHT;
-		toggle.setAttribute("aria-label", drawerOpen ? "Close panel" : "Open panel");
-		toggle.title = drawerOpen ? "Close panel" : "Open Coding Edition";
 	}
 	function toggleDrawer() {
 		drawerOpen = !drawerOpen;
@@ -542,7 +687,7 @@
 		return el;
 	}
 
-	// ── Settings tab ──
+	// ── Settings ──
 	function renderSettings(container) {
 		container.innerHTML = "";
 		container.appendChild(makeSectionLabel("Virtualization"));
@@ -586,21 +731,19 @@
 				if (n && n > 0) { cfg.contextWindow = n; saveConfig(); renderActiveTab(); updateStats(); }
 			},
 		}));
-		container.appendChild(makeSectionLabel("Actions"));
-		container.appendChild(makeActionButton("⬇ Export chat as Markdown", exportMarkdown));
-		container.appendChild(makeActionButton("↻ Force re-virtualize now", () => {
-			virtualize(); collapseOldThinking(getContainer());
-			if (activeTab === "stats") updateStats();
-			toast("Re-virtualized.", "success");
+		container.appendChild(makeRow({
+			label: "Composer selector (adv)", value: cfg.composerSelector || "(auto)",
+			onClick: () => {
+				const v = prompt("CSS selector for the chat input (blank = auto-detect):", cfg.composerSelector);
+				if (v !== null) { cfg.composerSelector = v.trim(); saveConfig(); renderActiveTab(); }
+			},
 		}));
-		container.appendChild(makeActionButton("⤓ Scroll to bottom", () => scrollToBottom(getContainer(), true)));
 	}
 
-	// ── Actions tab (NEW) ──
+	// ── Actions ──
 	function renderActions(container) {
 		container.innerHTML = "";
-
-		container.appendChild(makeSectionLabel("Pull request"));
+		container.appendChild(makeSectionLabel("Agent actions"));
 		container.appendChild(makeActionButton("⊕ Create PR", actionCreatePR));
 		container.appendChild(makeActionButton("⇲ Merge", actionMerge));
 
@@ -614,13 +757,16 @@
 		container.appendChild(makeSectionLabel("Export"));
 		container.appendChild(makeActionButton("⬇ Export as Markdown", exportMarkdown));
 
+		container.appendChild(makeSectionLabel("Debug"));
+		container.appendChild(makeActionButton("🔍 Run diagnostics (copies to clipboard)", actionDiagnostics));
+
 		const note = document.createElement("div");
 		note.style.cssText = "margin-top:16px;font-size:11px;color:#999;line-height:1.5;";
-		note.innerHTML = `PR / Merge / Clear actions look for Arena's own buttons in the current view and click them. If a button isn't present (e.g. no PR exists yet), you'll get a toast.`;
+		note.innerHTML = `PR/Merge are sent to the agent through the composer — Arena has no such buttons in its UI. If the composer isn't found, the text is copied to your clipboard so you can paste manually. Run diagnostics if actions fail.`;
 		container.appendChild(note);
 	}
 
-	// ── Statistics tab ──
+	// ── Stats ──
 	function renderStats(container) {
 		const s = computeStats();
 		container.innerHTML = "";
@@ -655,7 +801,7 @@
 		container.appendChild(makeRow({ label: "Thinking blocks", value: String(s.thinkingBlocks) }));
 		const footer = document.createElement("div");
 		footer.style.cssText = "margin-top:16px;font-size:11px;color:#999;line-height:1.5;";
-		footer.innerHTML = `Token counts are estimates (~4 chars/token).<br>Refreshes once per second while this tab is open.`;
+		footer.innerHTML = `Token counts are estimates (~4 chars/token).`;
 		container.appendChild(footer);
 	}
 
@@ -681,7 +827,6 @@
 		if (document.getElementById(DRAWER_ID)) return;
 		const drawer = document.createElement("aside");
 		drawer.id = DRAWER_ID;
-		drawer.setAttribute("aria-label", "Coding Edition panel");
 		drawer.style.cssText = `position:fixed;top:0;left:0;bottom:0;width:320px;z-index:2147483645;transform:translateX(-100%);transition:transform 0.24s cubic-bezier(0.4,0,0.2,1);font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#1a1a1a;`;
 		drawer.innerHTML = `
 			<div class="cc-drawer-panel" style="position:absolute;inset:0;background:#ffffff;border-right:1px solid #d4d4d4;box-shadow:2px 0 12px rgba(0,0,0,0.08);display:flex;flex-direction:column;overflow:hidden;">
@@ -705,8 +850,6 @@
 		});
 		const toggle = drawer.querySelector(`#${DRAWER_TOGGLE_ID}`);
 		toggle.style.cssText = `position:absolute;top:50%;left:320px;transform:translateY(-50%);width:30px;height:52px;background:#ffffff;color:#333;border:1px solid #d4d4d4;border-left:none;border-radius:0 8px 8px 0;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:2px 0 8px rgba(0,0,0,0.06);`;
-		toggle.addEventListener("mouseenter", () => (toggle.style.background = "#f5f5f5"));
-		toggle.addEventListener("mouseleave", () => (toggle.style.background = "#ffffff"));
 		toggle.addEventListener("click", toggleDrawer);
 		document.body.appendChild(drawer);
 		switchTab("settings");
@@ -718,6 +861,7 @@
 	// ═══════════════════════════════════════════════════════════════════
 	let timer = null;
 	let currentContainer = null;
+	let composerHiddenApplied = false;
 
 	function schedule() {
 		if (timer) clearTimeout(timer);
@@ -729,12 +873,13 @@
 				lastMsgCount = 0;
 				requestAnimationFrame(() => setupAutoScroll(container));
 			}
-			if (container) {
-				virtualize();
-				collapseOldThinking(container);
+			if (container) { virtualize(); collapseOldThinking(container); }
+			// Re-apply composer hiding only if previously applied successfully
+			if (cfg.hideComposer && composerHiddenApplied) {
+				if (!document.querySelector('[data-cc-composer-hide="1"]')) {
+					applyComposerVisibility();
+				}
 			}
-			// Re-apply composer hiding (React may have re-rendered the composer node)
-			if (cfg.hideComposer) applyComposerVisibility();
 		}, 200);
 	}
 
@@ -750,7 +895,11 @@
 		started = true;
 		createDrawer();
 		injectExportButton();
-		applyComposerVisibility();
+		if (cfg.hideComposer) {
+			const before = findComposer();
+			applyComposerVisibility();
+			composerHiddenApplied = !!before && !!document.querySelector('[data-cc-composer-hide="1"]');
+		}
 		schedule();
 		startObserver();
 		setTimeout(schedule, 1000);
@@ -780,7 +929,6 @@
 			started = true;
 			createDrawer();
 			injectExportButton();
-			applyComposerVisibility();
 			startObserver();
 			setInterval(updateStats, 1000);
 		}
