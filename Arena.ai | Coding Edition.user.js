@@ -1096,8 +1096,10 @@ let lastContinueClick = 0;
             }
         }
 
+        // Expanded selector list to catch Arena's various composer implementations.
         const candidates = qa(
-            'textarea,input[type="text"],[contenteditable],[role="textbox"],[role="combobox"]'
+            'textarea,input[type="text"],[contenteditable],[role="textbox"],[role="combobox"],' +
+            '[class*="composer"],[class*="prompt"],[class*="chat-input"],[class*="message-input"]'
         );
 
         let best = null;
@@ -1106,30 +1108,41 @@ let lastContinueClick = 0;
         for (const el of candidates) {
             if (!isVisible(el)) continue;
             if (el.closest('#cc-drawer,#cc-toggle,#cc-nav-export,#cc-toast,#cc-settings-modal,#cc-eye-toggle')) continue;
-            if (el.closest('[role="log"]')) continue;
             if (el.matches('input[type="hidden"],input[aria-hidden="true"]')) continue;
+
+            // Don't exclude [role="log"] outright — Arena may nest the composer inside it.
+            // Only skip if the element IS the log container itself.
+            if (el.getAttribute('role') === 'log') continue;
 
             const r = el.getBoundingClientRect();
             let score = 0;
 
-            if (r.bottom >= window.innerHeight * 0.65) score += 20;
-            else if (r.bottom >= window.innerHeight * 0.4) score += 10;
+            if (r.bottom >= window.innerHeight * 0.65) score += 25;
+            else if (r.bottom >= window.innerHeight * 0.4) score += 12;
 
-            if (r.width > 200) score += 10;
-            if (r.width > 400) score += 5;
+            if (r.width > 200) score += 12;
+            if (r.width > 400) score += 6;
 
-            if (el.tagName === 'TEXTAREA') score += 8;
-            if (el.isContentEditable) score += 6;
+            if (el.tagName === 'TEXTAREA') score += 10;
+            if (el.isContentEditable) score += 8;
+            if (el.getAttribute('role') === 'textbox') score += 8;
+            if (el.getAttribute('role') === 'combobox') score += 8;
 
-            if (!el.closest('header,nav,aside,[role="navigation"]')) score += 10;
-            if (!el.closest('[role="log"]')) score += 15;
+            if (!el.closest('header,nav,aside,[role="navigation"]')) score += 12;
 
-            if (el.getAttribute('placeholder') || el.getAttribute('aria-label')) {
+            const cls = (el.className || '') + ' ' + (el.getAttribute('class') || '');
+            if (/composer|prompt|chat|message|input/i.test(cls)) score += 10;
+
+            const placeholder = el.getAttribute('placeholder') || '';
+            const ariaLabel = el.getAttribute('aria-label') || '';
+            if (placeholder || ariaLabel) {
                 score += /message|prompt|ask|send|chat/i.test(
-                    (el.getAttribute('placeholder') || '') + ' ' +
-                    (el.getAttribute('aria-label') || '')
-                ) ? 5 : 0;
+                    placeholder + ' ' + ariaLabel
+                ) ? 8 : 0;
             }
+
+            // Prefer elements near the bottom of the viewport (typical composer placement).
+            if (r.bottom > window.innerHeight * 0.8) score += 15;
 
             if (score > bestScore) {
                 best = el;
@@ -3073,7 +3086,13 @@ ${inlineStyles}
 
             drawer.querySelector('[data-cc-settings]').addEventListener('click', (event) => {
                 event.stopPropagation();
-                openSettingsModal();
+                event.preventDefault();
+                try {
+                    openSettingsModal();
+                } catch (error) {
+                    console.error('[CC] Settings modal error:', error);
+                    toast('Settings modal failed to open.', true);
+                }
             });
 
             // Wire eye button inside drawer bar.
@@ -3315,6 +3334,7 @@ ${inlineStyles}
             virtualize();
             decorateCodeBlocks();
             dispatchThinkingMode(true);
+            applyTextMode();
             if (cfg.hideComposer) applyComposerHide();
             if (cfg.eyeToggle) applyEyeToggle();
             runSchedule();
@@ -3347,6 +3367,10 @@ ${inlineStyles}
             if (cfg.eyeToggle) {
                 document.documentElement.dataset.ccEye = '1';
                 applyEyeToggle();
+            }
+
+            if (cfg.textMode) {
+                applyTextMode();
             }
 
             schedule();
