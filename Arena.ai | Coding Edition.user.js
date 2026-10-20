@@ -1,15 +1,14 @@
-
-/* ═══════════════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════════════
  * Arena.ai | Coding Edition
  * Version: 3.4.0
- * ═══════════════════════════════════════════════════════════════════
+ * ══════════════════════════════════════════════════════════════════
  *
  * Performance, thinking-block management, scrolling, code export,
- * Markdown export, statistics, and a themed control drawer.
+ * HTML conversation export, statistics, and a themed control drawer.
  *
  * No external dependencies. Designed for React/Next.js SPA pages.
  *
- * ═══════════════════════════════════════════════════════════════════ */
+ * ══════════════════════════════════════════════════════════════════ */
 
 // ==UserScript==
 // @name         Arena.ai | Coding Edition
@@ -30,9 +29,9 @@
     if (window.__ccCodingEdition340) return;
     window.__ccCodingEdition340 = true;
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
     // CONFIG
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
 
     const STORAGE_KEY = 'ccCodingEdition';
 
@@ -54,7 +53,14 @@
         composerSelector: '',
         hideComposer: false,
 
-        showExport: true
+        showExport: true,
+
+        eyeToggle: false,
+
+        autoClickPageUpdated: true,
+        autoClickContinue: true,
+
+        textMode: false
     });
 
     let cfg = Object.assign(
@@ -70,6 +76,9 @@
             }
         })()
     );
+
+    // Pull-request state tracking: 'none' | 'open' | 'merged'
+    let prState = 'none';
 
     const saveConfig = () => {
         try {
@@ -113,12 +122,28 @@
     let snippetCounter = 0;
     let statisticsLastRefresh = 0;
 
+    // Settings modal
+    let settingsModal = null;
+    let activeSettingsTab = 'general';
+
+    // Nav bar export button
+    let navExportButton = null;
+
+    // Eye toggle button (side menu / drawer bar)
+    let eyeButton = null;
+
+    // Page-updated banner click guard
+    let lastClickedBanner = null;
+
+// Auto-click Continue button guard (timestamp of last click)
+let lastContinueClick = 0;
+
     const q = (selector, root = document) => root.querySelector(selector);
     const qa = (selector, root = document) => Array.from(root.querySelectorAll(selector));
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
     // THEME
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
 
     const THEME_CSS = `
         :root, html {
@@ -162,9 +187,13 @@
         }
 
         #cc-drawer, #cc-drawer *, #cc-toggle,
-        #cc-export, #cc-jump, #cc-toast {
+        #cc-export, #cc-jump, #cc-toast,
+        #cc-settings-modal, #cc-settings-modal *,
+        #cc-eye-toggle, #cc-nav-export {
             box-sizing: border-box;
         }
+
+        /* ═══ Drawer ═══ */
 
         #cc-drawer {
             position: fixed;
@@ -209,12 +238,14 @@
         #cc-toggle.cc-open { left: min(320px, calc(100vw - 44px)); }
         #cc-toggle:hover { background: var(--cc-hover); }
 
-        #cc-drawer button, #cc-export, #cc-jump {
+        #cc-drawer button, #cc-export, #cc-jump,
+        #cc-nav-export, #cc-eye-toggle {
             font-family: inherit;
         }
 
         #cc-drawer button:focus-visible, #cc-toggle:focus-visible,
-        #cc-export:focus-visible, #cc-jump:focus-visible {
+        #cc-export:focus-visible, #cc-jump:focus-visible,
+        #cc-nav-export:focus-visible, #cc-eye-toggle:focus-visible {
             outline: 2px solid var(--cc-accent);
             outline-offset: 2px;
         }
@@ -241,6 +272,8 @@
             cursor:pointer;
         }
 
+        /* ═══ Icon-only drawer tabs ═══ */
+
         .cc-tabs {
             display:flex;
             gap:0;
@@ -259,12 +292,70 @@
             cursor:pointer;
             font-size:12px;
             font-weight:600;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            flex-direction:column;
+            gap:2px;
         }
 
         .cc-tab.cc-active {
             color:var(--cc-text);
             border-bottom-color:var(--cc-accent);
         }
+
+        .cc-tab .cc-tab-icon {
+            font-size:16px;
+            line-height:1;
+        }
+
+        .cc-tab .cc-tab-label {
+            font-size:10px;
+            line-height:1;
+            letter-spacing:.2px;
+        }
+
+        /* Gear icon button (far right) opens Settings modal */
+
+        .cc-tab-gear {
+            flex:0 0 auto;
+            border:0;
+            border-bottom:2px solid transparent;
+            padding:11px 6px 9px;
+            color:var(--cc-text-muted);
+            background:transparent;
+            cursor:pointer;
+            font-size:16px;
+            line-height:1;
+        }
+
+        .cc-tab-gear.cc-active {
+            color:var(--cc-text);
+            border-bottom-color:var(--cc-accent);
+        }
+
+        .cc-tab-gear:hover { color:var(--cc-text); background:var(--cc-hover); }
+
+        /* Eye toggle button */
+
+        #cc-eye-toggle {
+            position:relative;
+            width:34px;
+            height:34px;
+            border:1px solid var(--cc-border);
+            border-radius:6px;
+            background:var(--cc-surface);
+            color:var(--cc-text);
+            cursor:pointer;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:16px;
+            margin:0 6px;
+            flex-shrink:0;
+        }
+
+        #cc-eye-toggle:hover { background:var(--cc-hover); }
 
         .cc-content {
             flex:1;
@@ -367,6 +458,8 @@
         }
 
         .cc-action:hover { background:var(--cc-hover); }
+        .cc-action:disabled { opacity:.45; cursor:not-allowed; }
+        .cc-action[aria-disabled="true"] { opacity:.45; cursor:not-allowed; pointer-events:none; }
         .cc-action-icon {
             width:16px;
             text-align:center;
@@ -417,15 +510,18 @@
 
         .cc-footer-note { color:var(--cc-text-muted); font-size:10px; line-height:1.5; padding:5px 2px; }
 
-        #cc-export {
+        /* ═══ Nav bar export button (top nav, left of diff viewer) ═══ */
+
+        #cc-nav-export {
             position:fixed;
-            right:16px;
-            bottom:16px;
-            z-index:2147483640;
+            top:14px;
+            left:calc(50% - 460px + 10px);
+            z-index:2147483641;
             display:flex;
             align-items:center;
-            gap:7px;
-            padding:9px 12px;
+            justify-content:center;
+            gap:6px;
+            padding:8px 11px;
             border:1px solid var(--cc-border);
             border-radius:8px;
             color:var(--cc-text);
@@ -433,14 +529,18 @@
             box-shadow:var(--cc-shadow);
             cursor:pointer;
             font-size:12px;
+            font-weight:600;
         }
-        #cc-export:hover { background:var(--cc-hover); }
-        #cc-export[hidden] { display:none !important; }
+
+        #cc-nav-export:hover { background:var(--cc-hover); }
+        #cc-nav-export[hidden] { display:none !important; }
+
+        /* ═══ Bottom-right jump button (repositioned up ~1.5x height) ═══ */
 
         #cc-jump {
             position:fixed;
             right:18px;
-            bottom:75px;
+            bottom:calc(16px + 1.5 * 36px);
             width:36px;
             height:36px;
             display:flex;
@@ -454,6 +554,119 @@
             cursor:pointer;
             font-size:22px;
         }
+
+        /* ═══ Settings modal ═══ */
+
+        #cc-settings-modal {
+            position:fixed;
+            inset:auto;
+            top:50%;
+            left:50%;
+            transform:translate(-50%,-50%) scale(0.96);
+            z-index:2147483648;
+            width:min(640px,92vw);
+            max-height:min(760px,92vh);
+            background:var(--cc-bg);
+            border:1px solid var(--cc-border);
+            border-radius:12px;
+            box-shadow:var(--cc-shadow-lg);
+            color:var(--cc-text);
+            display:flex;
+            flex-direction:column;
+            opacity:0;
+            pointer-events:none;
+            transition:opacity .2s,transform .2s;
+            font:13px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+        }
+
+        #cc-settings-modal.cc-visible {
+            opacity:1;
+            pointer-events:auto;
+            transform:translate(-50%,-50%) scale(1);
+        }
+
+        #cc-settings-modal.cc-hidden { display:none !important; }
+
+        #cc-settings-modal .cc-modal-backdrop {
+            position:fixed;
+            inset:0;
+            z-index:2147483647;
+            background:rgba(0,0,0,.35);
+            backdrop-filter:blur(2px);
+        }
+
+        #cc-settings-modal .cc-modal-header {
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            padding:14px 18px;
+            border-bottom:1px solid var(--cc-border);
+            flex-shrink:0;
+        }
+
+        #cc-settings-modal .cc-modal-title {
+            font-size:15px;
+            font-weight:700;
+        }
+
+        #cc-settings-modal .cc-modal-close {
+            border:0;
+            background:transparent;
+            color:var(--cc-text-muted);
+            font-size:22px;
+            line-height:1;
+            cursor:pointer;
+            width:32px;
+            height:32px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            border-radius:6px;
+        }
+
+        #cc-settings-modal .cc-modal-close:hover {
+            background:var(--cc-hover);
+            color:var(--cc-text);
+        }
+
+        #cc-settings-modal .cc-modal-tabs {
+            display:flex;
+            border-bottom:1px solid var(--cc-border);
+            flex-shrink:0;
+        }
+
+        #cc-settings-modal .cc-modal-tab {
+            flex:1;
+            border:0;
+            border-bottom:2px solid transparent;
+            padding:12px 8px;
+            color:var(--cc-text-muted);
+            background:transparent;
+            cursor:pointer;
+            font-size:12px;
+            font-weight:600;
+        }
+
+        #cc-settings-modal .cc-modal-tab.cc-active {
+            color:var(--cc-text);
+            border-bottom-color:var(--cc-accent);
+        }
+
+        #cc-settings-modal .cc-modal-tab:hover { color:var(--cc-text); }
+
+        #cc-settings-modal .cc-modal-body {
+            flex:1;
+            overflow-y:auto;
+            padding:18px;
+            display:flex;
+            flex-direction:column;
+            gap:18px;
+        }
+
+        #cc-settings-modal .cc-modal-panel { display:none; }
+        #cc-settings-modal .cc-modal-panel.cc-active { display:flex; flex-direction:column; gap:18px; }
+
+        /* ═══ Toast ═══ */
 
         #cc-toast {
             position:fixed;
@@ -476,17 +689,25 @@
         #cc-toast.cc-visible { opacity:1; transform:translate(-50%,0); }
         #cc-toast.cc-error { border-color:var(--cc-danger); }
 
+        /* ═══ Code block buttons (copy + download) ═══ */
+
         [data-cc-wrap="1"] { position:relative !important; }
-        [data-cc-wrap="1"] > .cc-code-download {
+
+        [data-cc-wrap="1"] > .cc-code-buttons {
             position:absolute;
             top:8px;
             right:8px;
+            display:flex;
+            gap:4px;
+            z-index:4;
+        }
+
+        [data-cc-wrap="1"] > .cc-code-buttons > button {
             width:28px;
             height:28px;
             display:flex;
             align-items:center;
             justify-content:center;
-            z-index:4;
             border:1px solid var(--cc-border);
             border-radius:6px;
             background:var(--cc-bg);
@@ -495,12 +716,101 @@
             cursor:pointer;
             opacity:.55;
             transition:opacity .15s,background .15s;
+            font-size:14px;
+            line-height:1;
+            padding:0;
         }
-        [data-cc-wrap="1"]:hover > .cc-code-download { opacity:1; }
-        [data-cc-wrap="1"] > .cc-code-download:hover { background:var(--cc-hover); }
+
+        [data-cc-wrap="1"]:hover > .cc-code-buttons > button { opacity:1; }
+        [data-cc-wrap="1"] > .cc-code-buttons > button:hover { background:var(--cc-hover); }
+
+        /* Hide legacy standalone download button class */
+        [data-cc-wrap="1"] > .cc-code-download { display:none !important; }
+
+        /* ═══ Visibility helpers ═══ */
 
         [data-cc-hidden="1"] { display:none !important; }
         [data-cc-thinking="1"] { display:none !important; }
+
+        /* ═══ Compact Mode — Conversation ═══ */
+
+        [data-cc-compact="1"] [role="log"] > *,
+        [data-cc-compact="1"] [role="log"] > * > * {
+            padding-top:2px !important;
+            padding-bottom:2px !important;
+        }
+        [data-cc-compact="1"] [role="log"] .prose,
+        [data-cc-compact="1"] [role="log"] [class*="prose"] {
+            margin-top:.25rem !important;
+            margin-bottom:.25rem !important;
+        }
+        [data-cc-compact="1"] [role="log"] p { margin-block:.3em !important; }
+        [data-cc-compact="1"] [role="log"] pre,
+        [data-cc-compact="1"] [role="log"] .code-block-header,
+        [data-cc-compact="1"] [role="log"] [class*="code-block"] {
+            padding-top:4px !important;
+            padding-bottom:4px !important;
+            margin-top:4px !important;
+            margin-bottom:4px !important;
+        }
+
+        /* ═══ Compact Mode — Composer (Arena only, never userscript UI) ═══ */
+
+        [data-cc-compact="1"] [role="composer"],
+        [data-cc-compact="1"] [class*="composer"],
+        [data-cc-compact="1"] [class*="prompt-input"],
+        [data-cc-compact="1"] textarea[placeholder*="message" i],
+        [data-cc-compact="1"] [contenteditable][data-cc-composer="1"] {
+            font-size:13px !important;
+            padding-top:6px !important;
+            padding-bottom:6px !important;
+        }
+
+        [data-cc-compact="1"] [role="composer"] button,
+        [data-cc-compact="1"] [class*="composer"] button,
+        [data-cc-compact="1"] [class*="prompt-input"] button {
+            padding:4px 8px !important;
+            font-size:12px !important;
+        }
+
+        [data-cc-compact="1"] #cc-drawer,
+        [data-cc-compact="1"] #cc-toggle,
+        [data-cc-compact="1"] #cc-nav-export,
+        [data-cc-compact="1"] #cc-eye-toggle,
+        [data-cc-compact="1"] #cc-settings-modal {
+            font-size:inherit !important;
+            padding:inherit !important;
+        }
+
+        /* ═══ Text Mode ═══ */
+
+        [data-cc-textmode="1"] [role="log"] pre,
+        [data-cc-textmode="1"] [role="log"] .code-block,
+        [data-cc-textmode="1"] [role="log"] [class*="code-block"] {
+            position:relative !important;
+            overflow:hidden !important;
+            max-height:48px !important;
+        }
+
+        [data-cc-textmode="1"] [role="log"] pre > code,
+        [data-cc-textmode="1"] [role="log"] pre > * {
+            display:none !important;
+        }
+
+        [data-cc-textmode="1"] [role="log"] pre::after {
+            content:attr(data-cc-textdesc);
+            display:block !important;
+            padding:8px 12px !important;
+            font-size:12px !important;
+            font-family:ui-monospace, SFMono-Regular, Menlo, monospace !important;
+            color:var(--cc-text-muted) !important;
+            background:var(--cc-surface-2) !important;
+            border:1px dashed var(--cc-border) !important;
+            border-radius:6px !important;
+            white-space:pre-wrap !important;
+            word-break:break-all !important;
+            line-height:1.5 !important;
+        }
 
         @media(max-width:380px) {
             #cc-drawer { width:calc(100vw - 36px); }
@@ -522,6 +832,10 @@
     injectStyle('cc-theme', THEME_CSS);
 
     function updateDynamicCSS() {
+        document.documentElement.dataset.ccCompact = cfg.compactMode ? '1' : '';
+        document.documentElement.dataset.ccEye = cfg.eyeToggle ? '1' : '';
+        document.documentElement.dataset.ccTextmode = cfg.textMode ? '1' : '';
+
         const css = `
             ${cfg.thinkingMode === 'hide' ? '[data-cc-thinking="1"]{display:none!important;}' : ''}
             ${cfg.compactMode ? `
@@ -546,19 +860,18 @@
         injectStyle('cc-dynamic', css);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
     // PERF CSS
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
 
-    // Kept separate so performance rules are never lost during settings updates.
     injectStyle('cc-perf', `
         [data-cc-hidden="1"] { display:none !important; }
         [data-cc-flat="1"] { contain:content; }
     `);
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
     // TOAST
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
 
     function toast(message, error = false, duration = 3000) {
         let el = q('#cc-toast');
@@ -579,9 +892,66 @@
         toastTimer = setTimeout(() => el.classList.remove('cc-visible'), duration);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
+    // EYE TOGGLE — Side menu visibility control
+    // ══════════════════════════════════════════════════════════════════
+
+    function createEyeButton() {
+        if (eyeButton && eyeButton.isConnected) return eyeButton;
+
+        eyeButton = document.createElement('button');
+        eyeButton.id = 'cc-eye-toggle';
+        eyeButton.type = 'button';
+        eyeButton.setAttribute('aria-pressed', 'false');
+        eyeButton.setAttribute('aria-label', 'Hide non-userscript UI (eye open)');
+        eyeButton.textContent = cfg.eyeToggle ? '👁️' : '🙈';
+        eyeButton.title = 'Toggle viewport visibility';
+
+        eyeButton.addEventListener('click', () => {
+            cfg.eyeToggle = !cfg.eyeToggle;
+            saveConfig();
+            updateDynamicCSS();
+            eyeButton.textContent = cfg.eyeToggle ? '👁️' : '🙈';
+            eyeButton.setAttribute('aria-pressed', String(cfg.eyeToggle));
+            eyeButton.setAttribute('aria-label',
+                cfg.eyeToggle
+                    ? 'Hide non-userscript UI (eye open)'
+                    : 'Show all UI (eye closed)'
+            );
+            toast(cfg.eyeToggle ? 'Non-userscript UI hidden' : 'All UI restored');
+            renderDrawer();
+        });
+
+        return eyeButton;
+    }
+
+    function applyEyeToggle() {
+        if (!cfg.eyeToggle) {
+            document.documentElement.dataset.ccEye = '';
+            return;
+        }
+
+        document.documentElement.dataset.ccEye = '1';
+
+        // Hide Arena composer and other non-userscript UI components.
+        const composer = findComposer();
+        if (composer && !composer.closest('#cc-drawer,#cc-toggle,#cc-nav-export,#cc-eye-toggle,#cc-settings-modal')) {
+            composer.style.setProperty('display', 'none', 'important');
+            composer.dataset.ccEyeHidden = '1';
+        }
+    }
+
+    function restoreEyeToggle() {
+        document.documentElement.dataset.ccEye = '';
+        for (const el of qa('[data-cc-eye-hidden="1"]')) {
+            el.style.removeProperty('display');
+            delete el.dataset.ccEyeHidden;
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
     // DOM HELPERS
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
 
     function findLog() {
         const logs = qa('[role="log"]');
@@ -607,11 +977,6 @@
             !!el.querySelector('pre,.prose,[class*="prose"],[class*="markdown"],button[data-state]');
     }
 
-    /*
-     * Find the real message list by descending through single-child
-     * wrappers, never by assuming that [role=log] contains messages
-     * directly. The depth is intentionally bounded.
-     */
     function findMessageList(log) {
         if (!log) return { parent: null, messages: [] };
 
@@ -714,9 +1079,9 @@
             .slice(0, 100) || 'arena-chat';
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
     // COMPOSER FINDER
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
 
     function findComposer() {
         if (cfg.composerSelector) {
@@ -740,7 +1105,7 @@
 
         for (const el of candidates) {
             if (!isVisible(el)) continue;
-            if (el.closest('#cc-drawer,#cc-toggle,#cc-export,#cc-toast')) continue;
+            if (el.closest('#cc-drawer,#cc-toggle,#cc-nav-export,#cc-toast,#cc-settings-modal,#cc-eye-toggle')) continue;
             if (el.closest('[role="log"]')) continue;
             if (el.matches('input[type="hidden"],input[aria-hidden="true"]')) continue;
 
@@ -776,9 +1141,110 @@
         return best;
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
+    // PR STATE DETECTION
+    // ══════════════════════════════════════════════════════════════════
+
+    function detectPRState() {
+        // Look for PR indicators in the conversation: GitHub PR URLs,
+        // Arena PR badges, assistant confirmation messages.
+        const text = (document.body.textContent || '');
+
+        const mergedPattern = /(pull.?request|PR)[^.\n]{0,80}?(merged|closed|deployed)/i;
+        const openPattern = /(pull.?request|PR)[^.\n]{0,80}?(open|created|#\d+|https:\/\/github\.com\/[^\/]+\/[^\/]+\/pull\/\d+)/i;
+
+        if (mergedPattern.test(text)) return 'merged';
+        if (openPattern.test(text)) return 'open';
+
+        // Check for explicit userscript session state (could be extended)
+        return prState || 'none';
+    }
+
+    function setPRState(state) {
+        prState = state;
+        updatePRButtons();
+    }
+
+    function updatePRButtons() {
+        if (!drawer || !drawer.isConnected) return;
+
+        const createBtn = q('#cc-btn-create-pr', drawer);
+        const mergeBtn = q('#cc-btn-merge-pr', drawer);
+
+        if (!createBtn || !mergeBtn) return;
+
+        const open = prState === 'open';
+        const merged = prState === 'merged';
+
+        createBtn.disabled = open || merged;
+        createBtn.setAttribute('aria-disabled', String(createBtn.disabled));
+        createBtn.classList.toggle('cc-action-disabled', createBtn.disabled);
+
+        mergeBtn.disabled = !open;
+        mergeBtn.setAttribute('aria-disabled', String(mergeBtn.disabled));
+        mergeBtn.classList.toggle('cc-action-disabled', mergeBtn.disabled);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // AUTO-CLICK CONTINUE BUTTON (after PR merged)
+    // ══════════════════════════════════════════════════════════════════
+
+    /**
+     * When a PR has been merged, Arena often shows a "Continue" button
+     * in the composer panel. Detect and click it automatically.
+     * Runs only when prState === 'merged', with a cooldown guard.
+     */
+    function clickContinueButton() {
+        if (prState !== 'merged') return;
+        if (!cfg.autoClickContinue) return;
+
+        const now = Date.now();
+        if (now - lastContinueClick < 3000) return; // 3s cooldown
+
+        const composer = findComposer();
+        if (!composer) return;
+
+        // Search within the composer's nearest panel/container for a Continue button.
+        const panel = composer.closest(
+            '[class*="composer"], [class*="prompt"], [role="combobox"], section, div'
+        ) || composer.parentElement;
+
+        if (!panel) return;
+
+        const continueCandidates = qa('button,a,[role="button"]', panel).filter(el => {
+            if (!isVisible(el)) return false;
+            const label = [
+                textContent(el),
+                el.getAttribute('aria-label') || '',
+                el.getAttribute('title') || ''
+            ].join(' ').trim();
+            return /^continue$/i.test(label) || /continue/i.test(label);
+        });
+
+        // Prefer candidates closest to the bottom of the panel (typical Continue placement).
+        continueCandidates.sort((a, b) => {
+            const ra = a.getBoundingClientRect();
+            const rb = b.getBoundingClientRect();
+            return rb.bottom - ra.bottom;
+        });
+
+        for (const btn of continueCandidates) {
+            try {
+                btn.click();
+                lastContinueClick = now;
+                toast('Continue button clicked.');
+                return true;
+            } catch (_) {
+                // Try next candidate.
+            }
+        }
+
+        return false;
+    }
+
+    // ══════════════════════════════════════════════════════════════════
     // VIRTUALIZE
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
 
     function flattenShiki(message) {
         if (!cfg.flattenCode || !message) return;
@@ -789,8 +1255,6 @@
             const code = q('code', pre);
             if (!code) continue;
 
-            // Prefer Shiki line elements so line breaks survive even when
-            // syntax spans contain complicated nested markup.
             const lines = qa('.line', code);
             let plain;
 
@@ -865,9 +1329,9 @@
         return found;
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
     // THINKING
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
 
     const THINKING_TEXT = /think|thought|reason|chain[-\s]of[-\s]thought/i;
 
@@ -938,8 +1402,6 @@
         }
 
         if (mode === 'collapse') {
-            // A collapse sweep is only triggered by an actual increase in
-            // message count. Manual expansion remains untouched otherwise.
             if (!force && count <= lastCollapseCount) return;
             lastCollapseCount = count;
 
@@ -955,9 +1417,9 @@
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
     // AUTO-SCROLL
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
 
     function removeJumpButton() {
         jumpButton?.remove();
@@ -1046,118 +1508,58 @@
         });
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    // MARKDOWN
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
+    // HTML EXPORT (single self-contained .html file)
+    // ══════════════════════════════════════════════════════════════════
 
-    const SKIP_MARKDOWN_TAGS = new Set([
-        'SCRIPT', 'STYLE', 'SVG', 'NOSCRIPT', 'BUTTON'
-    ]);
-
-    function languageOf(pre) {
-        const code = q('code', pre) || pre;
-        const candidates = [
-            pre.dataset.language,
-            code.dataset.language,
-            ...Array.from(pre.classList),
-            ...Array.from(code.classList)
-        ];
-
-        for (const value of candidates) {
-            const match = String(value).match(
-                /^(?:language-|lang-)?([a-zA-Z0-9_+#.-]+)$/
-            );
-            if (match && /^(?:language-|lang-)/.test(value)) return match[1];
+    function collectInlineStyles(doc) {
+        const styles = [];
+        for (const link of qa('link[rel="stylesheet"]', doc)) {
+            try {
+                const href = link.getAttribute('href');
+                if (!href) continue;
+                const abs = new URL(href, location.href).href;
+                styles.push(`/* External stylesheet: ${abs} */\n/* Not inlined — stylesheet could not be fetched synchronously */\n`);
+            } catch (_) {
+                // skip
+            }
         }
-
-        return '';
+        for (const style of qa('style', doc)) {
+            if (style.id && (style.id.startsWith('cc-') || style.id === 'cc-theme')) continue;
+            styles.push(style.textContent || '');
+        }
+        return styles.join('\n');
     }
 
-    function markdownWalk(node, listDepth = 0) {
-        if (!node) return '';
-        if (node.nodeType === Node.TEXT_NODE) return node.nodeValue || '';
-        if (node.nodeType !== Node.ELEMENT_NODE) return '';
+    function cloneConversation(log) {
+        if (!log) return null;
 
-        const el = node;
-        if (SKIP_MARKDOWN_TAGS.has(el.tagName)) return '';
-        if (el.getAttribute('aria-hidden') === 'true') return '';
+        const clone = log.cloneNode(true);
 
-        const tag = el.tagName.toLowerCase();
-
-        if (tag === 'pre') {
-            const language = languageOf(el);
-            const code = q('code', el) || el;
-            const content = (code.innerText || code.textContent || '')
-                .replace(/\n+$/, '');
-            return '\n\n```' + language + '\n' + content + '\n```\n\n';
+        // Unhide virtualized messages so the full conversation appears.
+        for (const hidden of qa('[data-cc-hidden="1"]', clone)) {
+            hidden.removeAttribute('data-cc-hidden');
         }
 
-        if (tag === 'code') {
-            return '`' + (el.textContent || '').replace(/`/g, '\\`') + '`';
+        // Remove userscript-injected UI and controls from the snapshot.
+        for (const sel of [
+            '#cc-drawer', '#cc-toggle', '#cc-nav-export', '#cc-eye-toggle',
+            '#cc-settings-modal', '#cc-toast', '#cc-jump',
+            '.cc-code-download', '.cc-code-copy', '.cc-code-buttons',
+            '[data-cc-wrap="1"] > .cc-code-download',
+            '[data-cc-wrap="1"] > .cc-code-copy',
+            '[data-cc-wrap="1"] > .cc-code-buttons',
+            'script'
+        ]) {
+            for (const el of qa(sel, clone)) {
+                el.remove();
+            }
         }
 
-        if (/^h[1-6]$/.test(tag)) {
-            return '\n\n' + '#'.repeat(Number(tag[1])) + ' ' +
-                childrenMarkdown(el, listDepth) + '\n\n';
-        }
-
-        if (tag === 'strong' || tag === 'b') {
-            return '**' + childrenMarkdown(el, listDepth) + '**';
-        }
-
-        if (tag === 'em' || tag === 'i') {
-            return '*' + childrenMarkdown(el, listDepth) + '*';
-        }
-
-        if (tag === 'a') {
-            const text = childrenMarkdown(el, listDepth);
-            const href = el.getAttribute('href');
-            return href ? '[' + text + '](' + href + ')' : text;
-        }
-
-        if (tag === 'br') return '\n';
-        if (tag === 'hr') return '\n\n---\n\n';
-
-        if (tag === 'li') {
-            const parent = el.parentElement;
-            const ordered = parent?.tagName === 'OL';
-            const siblings = Array.from(parent?.children || []);
-            const index = siblings.indexOf(el) + 1;
-            const prefix = ordered ? index + '. ' : '- ';
-            const indent = '  '.repeat(Math.max(0, listDepth));
-            return '\n' + indent + prefix + childrenMarkdown(el, listDepth + 1).trim();
-        }
-
-        if (tag === 'ul' || tag === 'ol') {
-            return '\n' + childrenMarkdown(el, listDepth) + '\n';
-        }
-
-        if (tag === 'blockquote') {
-            const text = childrenMarkdown(el, listDepth).trim();
-            return '\n\n' + text.split('\n').map(line => '> ' + line).join('\n') + '\n\n';
-        }
-
-        if (['p', 'div', 'section', 'article', 'table', 'tr'].includes(tag)) {
-            return '\n\n' + childrenMarkdown(el, listDepth).trim() + '\n\n';
-        }
-
-        return childrenMarkdown(el, listDepth);
+        return clone;
     }
 
-    function childrenMarkdown(el, depth = 0) {
-        return Array.from(el.childNodes)
-            .map(child => markdownWalk(child, depth))
-            .join('');
-    }
-
-    function messageMarkdown(message) {
-        return childrenMarkdown(message)
-            .replace(/[ \t]+\n/g, '\n')
-            .replace(/\n{3,}/g, '\n\n')
-            .trim();
-    }
-
-    function exportChatMarkdown() {
+    function exportChatHTML() {
         const log = currentLog || findLog();
         if (!log) {
             toast('No chat container found.', true);
@@ -1169,35 +1571,72 @@
             ? found.messages.slice().reverse()
             : found.messages.slice();
 
+        // Build a minimal HTML document.
         const title = safePageTitle();
         const date = new Date().toISOString().slice(0, 10);
-        const output = [
-            '# ' + title,
-            '',
-            '> Exported: ' + new Date().toLocaleString(),
-            '> Page: ' + location.href,
-            '> Messages: ' + messages.length,
-            '',
-            '---',
-            ''
-        ];
+        const filename = sanitizeFilename(title) + '-' + date + '.html';
 
-        messages.forEach((message, index) => {
-            output.push('## Message ' + (index + 1));
-            output.push('');
-            output.push(messageMarkdown(message));
-            output.push('');
-            output.push('---');
-            output.push('');
-        });
+        const themeAttr = document.documentElement.getAttribute('class') || '';
+        const themeDataTheme = document.documentElement.getAttribute('data-theme') || '';
+        const rootStyles = Array.from(document.documentElement.style)
+            .map(prop => `${prop}:${document.documentElement.style.getPropertyValue(prop)}`)
+            .join(';');
 
-        downloadBlob(
-            output.join('\n'),
-            sanitizeFilename(title) + '-' + date + '.md',
-            'text/markdown;charset=utf-8'
-        );
+        const cloned = cloneConversation(log);
+        const conversationHTML = cloned ? cloned.outerHTML : '';
 
-        toast('Markdown export generated.');
+        const inlineStyles = collectInlineStyles(document);
+
+        const html = `<!DOCTYPE html>
+<html lang="en" class="${themeAttr}" data-theme="${themeDataTheme}" style="${rootStyles}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${title} — Conversation Export</title>
+<style>
+/* Captured Arena theme & layout styles */
+:root, html {
+  --cc-bg: #ffffff;
+  --cc-surface: #fafafa;
+  --cc-text: #18181b;
+  --cc-text-muted: #71717a;
+  --cc-border: #e4e4e7;
+}
+html.dark, html[data-theme="dark"] {
+  --cc-bg: #09090b;
+  --cc-surface: #18181b;
+  --cc-text: #fafafa;
+  --cc-text-muted: #a1a1aa;
+  --cc-border: #3f3f46;
+}
+body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin:0; padding:24px; color:var(--cc-text); background:var(--cc-bg); }
+.conversation-export { max-width:900px; margin:0 auto; }
+.conversation-export h1 { font-size:20px; margin:0 0 8px; }
+.conversation-export .meta { color:var(--cc-text-muted); font-size:12px; margin-bottom:16px; border-bottom:1px solid var(--cc-border); padding-bottom:12px; }
+.conversation-export .message { margin-bottom:24px; padding:12px 16px; border:1px solid var(--cc-border); border-radius:8px; background:var(--cc-surface); }
+.conversation-export .message pre { background:#f4f4f5; border-radius:6px; padding:12px; overflow:auto; }
+.conversation-export .message code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+html.dark .conversation-export .message pre, html[data-theme="dark"] .conversation-export .message pre { background:#27272a; }
+${inlineStyles}
+</style>
+</head>
+<body>
+<div class="conversation-export">
+  <h1>${title}</h1>
+  <div class="meta">
+    Exported: ${new Date().toLocaleString()}<br>
+    Page: ${location.href}<br>
+    Messages: ${messages.length}
+  </div>
+  <div class="messages">
+    ${conversationHTML}
+  </div>
+</div>
+</body>
+</html>`;
+
+        downloadBlob(html, filename, 'text/html;charset=utf-8');
+        toast('Conversation exported as HTML.');
     }
 
     function downloadBlob(content, filename, mime) {
@@ -1216,9 +1655,49 @@
         setTimeout(() => URL.revokeObjectURL(url), 1500);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
+    // AUTO-CLICK "PAGE UPDATED" BANNER
+    // ══════════════════════════════════════════════════════════════════
+
+    function clickPageUpdatedBanner() {
+        const candidates = qa('button,a,[role="button"],div[class*="toast"],div[class*="banner"],div[class*="notification"]');
+
+        for (const el of candidates) {
+            if (!isVisible(el)) continue;
+            const label = [
+                textContent(el),
+                el.getAttribute('aria-label') || '',
+                el.getAttribute('title') || ''
+            ].join(' ').trim();
+
+            if (!label) continue;
+
+            const matches = /page\s+updated|click\s+here|open\s+in\s+a\s+new\s+tab|reload|refresh/i.test(label);
+            if (!matches) continue;
+
+            // Avoid clicking the same element twice.
+            if (el === lastClickedBanner) continue;
+
+            lastClickedBanner = el;
+            setTimeout(() => { lastClickedBanner = null; }, 5000);
+
+            try { el.click(); } catch (_) {}
+            toast('Page-update banner clicked.');
+            return true;
+        }
+
+        return false;
+    }
+
+    function watchPageUpdatedBanner() {
+        // Debounced scan; triggered by schedule() and MutationObserver.
+        if (!cfg.autoClickPageUpdated) return;
+        clickPageUpdatedBanner();
+    }
+
+    // ══════════════════════════════════════════════════════════════════
     // AGENT ACTIONS
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
 
     async function copyText(text) {
         try {
@@ -1295,6 +1774,28 @@
         }
     }
 
+    async function mergePR() {
+        const message =
+            'The pull request has been created. Please merge it and let me know the result.';
+
+        const composer = findComposer();
+
+        if (!composer) {
+            await copyText(message);
+            toast('Composer not found. Request copied to clipboard if supported.', true, 4500);
+            return;
+        }
+
+        try {
+            setNativeValue(composer, message);
+            composer.focus();
+            toast('Merge request entered in the composer. Review it and submit when ready.');
+        } catch (error) {
+            await copyText(message);
+            toast('Could not populate composer. Request copied if clipboard is available.', true);
+        }
+    }
+
     async function clearChat() {
         const before = getMessages(findLog()).length;
         const patterns = [
@@ -1321,8 +1822,6 @@
 
                 if (!label || !patterns.some(pattern => pattern.test(label))) return false;
 
-                // A button that merely contains "new chat" as a fragment
-                // of unrelated content is less likely to be the intended action.
                 return true;
             })
             .map(el => {
@@ -1363,6 +1862,7 @@
             timestamp: new Date().toISOString(),
             url: location.href,
             title: document.title,
+            prState,
             log: log ? {
                 tag: log.tagName,
                 className: String(log.className || ''),
@@ -1397,9 +1897,9 @@
         toast(copied ? 'Diagnostics logged and copied.' : 'Diagnostics logged. Clipboard unavailable.', !copied);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
     // COMPOSER VISIBILITY
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
 
     function restoreComposer() {
         const marked = qa('[data-cc-composer-hide="1"]');
@@ -1470,9 +1970,9 @@
         return true;
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
     // CODE BLOCK EXPORT
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
 
     const EXTENSIONS = {
         js:'js', mjs:'mjs', cjs:'cjs',
@@ -1568,17 +2068,35 @@
 
         for (const message of visibleMessages) {
             for (const pre of qa('pre', message)) {
+                if (pre.closest('[data-cc-hidden="1"]')) continue;
+
+                // Determine if this block is eligible for download (not shell/output)
+                const cls = (pre.className || '') + ' ' + (q('code', pre)?.className || '');
+                const isShellOutput = /(bash|sh|shell|zsh|powershell|ps1|console|stdout|stderr|terminal|output)/i.test(cls);
+                const isDownloadable = !isShellOutput;
+
                 if (pre.dataset.ccDecorated === '1') {
                     const wrapper = pre.parentElement;
-                    if (wrapper?.dataset.ccWrap === '1' &&
-                        q('.cc-code-download', wrapper)) continue;
-
+                    const buttons = q('.cc-code-buttons', wrapper);
+                    if (buttons && wrapper.dataset.ccWrap === '1') {
+                        // Ensure copy button exists on all blocks
+                        if (!q('.cc-code-copy', buttons)) {
+                            addCodeCopyButton(buttons, pre);
+                        }
+                        // Ensure download button exists only on eligible blocks
+                        if (isDownloadable && !q('.cc-code-download', buttons)) {
+                            addCodeDownloadButton(buttons, pre);
+                        }
+                        // Remove download button if no longer eligible
+                        if (!isDownloadable) {
+                            const dl = q('.cc-code-download', buttons);
+                            if (dl) dl.remove();
+                        }
+                        continue;
+                    }
                     delete pre.dataset.ccDecorated;
                 }
 
-                if (pre.closest('[data-cc-hidden="1"]')) continue;
-
-                // React can replace a pre while preserving a wrapper.
                 let wrapper = pre.parentElement;
                 if (wrapper?.dataset.ccWrap !== '1') {
                     wrapper = document.createElement('div');
@@ -1588,27 +2106,20 @@
                     wrapper.appendChild(pre);
                 }
 
-                if (!q('.cc-code-download', wrapper)) {
-                    const button = document.createElement('button');
-                    button.type = 'button';
-                    button.className = 'cc-code-download';
-                    button.textContent = '⬇';
-                    button.title = 'Download code';
-                    button.setAttribute('aria-label', 'Download code block');
+                // Create side-by-side buttons container
+                let buttons = q('.cc-code-buttons', wrapper);
+                if (!buttons) {
+                    buttons = document.createElement('div');
+                    buttons.className = 'cc-code-buttons';
+                    wrapper.appendChild(buttons);
+                }
 
-                    button.addEventListener('click', event => {
-                        event.preventDefault();
-                        event.stopPropagation();
+                // Every block gets a copy button
+                addCodeCopyButton(buttons, pre);
 
-                        const code = q('code', pre) || pre;
-                        const content = code.innerText || code.textContent || '';
-                        const filename = extractCodeFilename(pre, ++snippetCounter);
-
-                        downloadBlob(content, filename, 'text/plain;charset=utf-8');
-                        toast('Downloaded ' + filename);
-                    });
-
-                    wrapper.appendChild(button);
+                // Only eligible blocks get a download button
+                if (isDownloadable) {
+                    addCodeDownloadButton(buttons, pre);
                 }
 
                 pre.dataset.ccDecorated = '1';
@@ -1616,9 +2127,111 @@
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    function addCodeCopyButton(container, pre) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'cc-code-copy';
+        button.textContent = '📋';
+        button.title = 'Copy code';
+        button.setAttribute('aria-label', 'Copy code block');
+
+        button.addEventListener('click', async event => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const code = q('code', pre) || pre;
+            const content = code.innerText || code.textContent || '';
+            const success = await copyText(content);
+            toast(success ? 'Copied to clipboard' : 'Copy failed', !success);
+        });
+
+        container.appendChild(button);
+    }
+
+    function addCodeDownloadButton(container, pre) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'cc-code-download';
+        button.textContent = '⬇';
+        button.title = 'Download code';
+        button.setAttribute('aria-label', 'Download code block');
+
+        button.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const code = q('code', pre) || pre;
+            const content = code.innerText || code.textContent || '';
+            const filename = extractCodeFilename(pre, ++snippetCounter);
+
+            downloadBlob(content, filename, 'text/plain;charset=utf-8');
+            toast('Downloaded ' + filename);
+        });
+
+        container.appendChild(button);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // TEXT MODE
+    // ══════════════════════════════════════════════════════════════════
+
+    function applyTextMode() {
+        if (!currentLog) return;
+
+        const visibleMessages = getMessages(currentLog).filter(
+            message => message.dataset.ccHidden !== '1'
+        );
+
+        for (const message of visibleMessages) {
+            for (const pre of qa('pre', message)) {
+                const code = q('code', pre) || pre;
+                const originalContent = code.innerText || code.textContent || '';
+
+                // Store original content for restoration
+                if (!pre.dataset.ccOriginalCode) {
+                    pre.dataset.ccOriginalCode = originalContent;
+                }
+
+                if (cfg.textMode) {
+                    const language = detectCodeLanguage(pre) || 'text';
+                    const lineCount = originalContent.split('\n').length;
+
+                    // Try to extract a filename from nearby labels
+                    const filename = extractCodeFilename(pre, 0);
+                    const isFilename = filename && filename !== 'snippet-0.txt' && !filename.startsWith('snippet-');
+
+                    let description;
+                    if (isFilename) {
+                        description = 'Examined file: ' + filename;
+                    } else {
+                        description = '[Code block: ' + language + ', ' + lineCount + ' lines]';
+                    }
+
+                    pre.setAttribute('data-cc-textdesc', description);
+                    pre.style.setProperty('max-height', '48px', 'important');
+
+                    // Hide actual code content
+                    const innerCode = q('code', pre);
+                    if (innerCode) {
+                        innerCode.style.setProperty('display', 'none', 'important');
+                    }
+                } else {
+                    // Restore original code content
+                    pre.removeAttribute('data-cc-textdesc');
+                    pre.style.removeProperty('max-height');
+
+                    const innerCode = q('code', pre);
+                    if (innerCode) {
+                        innerCode.style.removeProperty('display');
+                    }
+                }
+            }
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
     // STATISTICS
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
 
     function countStats() {
         const log = currentLog || findLog();
@@ -1699,9 +2312,359 @@
         return String(n);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
+    // SETTINGS MODAL
+    // ══════════════════════════════════════════════════════════════════
+
+    function createSettingsModal() {
+        if (settingsModal && settingsModal.isConnected) return settingsModal;
+
+        settingsModal = document.createElement('div');
+        settingsModal.id = 'cc-settings-modal';
+        settingsModal.setAttribute('role', 'dialog');
+        settingsModal.setAttribute('aria-modal', 'true');
+        settingsModal.setAttribute('aria-label', 'Coding Edition Settings');
+        settingsModal.className = 'cc-hidden';
+        settingsModal.innerHTML = `
+            <div class="cc-modal-backdrop" id="cc-modal-backdrop"></div>
+            <div class="cc-modal-panel">
+                <div class="cc-modal-header">
+                    <div class="cc-modal-title">Coding Edition Settings</div>
+                    <button class="cc-modal-close" type="button" aria-label="Close settings">×</button>
+                </div>
+                <div class="cc-modal-tabs">
+                    <button class="cc-modal-tab cc-active" type="button" data-settings-tab="general">General</button>
+                    <button class="cc-modal-tab" type="button" data-settings-tab="thinking">Thinking</button>
+                    <button class="cc-modal-tab" type="button" data-settings-tab="scrolling">Scrolling</button>
+                    <button class="cc-modal-tab" type="button" data-settings-tab="display">Display</button>
+                    <button class="cc-modal-tab" type="button" data-settings-tab="diagnostics">Diagnostics</button>
+                </div>
+                <div class="cc-modal-body">
+                    <div class="cc-modal-panel cc-active" data-settings-panel="general"></div>
+                    <div class="cc-modal-panel" data-settings-panel="thinking"></div>
+                    <div class="cc-modal-panel" data-settings-panel="scrolling"></div>
+                    <div class="cc-modal-panel" data-settings-panel="display"></div>
+                    <div class="cc-modal-panel" data-settings-panel="diagnostics"></div>
+                </div>
+            </div>
+        `;
+
+        const closeModal = () => {
+            settingsModal.classList.remove('cc-visible');
+            settingsModal.classList.add('cc-hidden');
+        };
+
+        settingsModal.querySelector('#cc-modal-backdrop').addEventListener('click', closeModal);
+        settingsModal.querySelector('.cc-modal-close').addEventListener('click', closeModal);
+
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && settingsModal.classList.contains('cc-visible')) {
+                closeModal();
+            }
+        }, true);
+
+        qa('.cc-modal-tab', settingsModal).forEach(tab => {
+            tab.addEventListener('click', () => {
+                activeSettingsTab = tab.dataset.settingsTab;
+                renderSettingsModal();
+            });
+        });
+
+        document.documentElement.appendChild(settingsModal);
+        return settingsModal;
+    }
+
+    function openSettingsModal() {
+        const modal = createSettingsModal();
+        activeSettingsTab = 'general';
+        renderSettingsModal();
+        modal.classList.remove('cc-hidden');
+        // Allow one frame for display:block before fading in.
+        requestAnimationFrame(() => modal.classList.add('cc-visible'));
+    }
+
+    function closeSettingsModal() {
+        if (!settingsModal) return;
+        settingsModal.classList.remove('cc-visible');
+        settingsModal.classList.add('cc-hidden');
+    }
+
+    function renderSettingsModal() {
+        if (!settingsModal || !settingsModal.isConnected) return;
+
+        const body = q('.cc-modal-body', settingsModal);
+        if (!body) return;
+
+        // Update tab active states.
+        qa('.cc-modal-tab', settingsModal).forEach(tab => {
+            const active = tab.dataset.settingsTab === activeSettingsTab;
+            tab.classList.toggle('cc-active', active);
+            tab.setAttribute('aria-selected', String(active));
+        });
+
+        // Render the active panel.
+        for (const panel of qa('.cc-modal-panel', body)) {
+            panel.classList.toggle('cc-active', panel.dataset.settingsPanel === activeSettingsTab);
+        }
+
+        const panel = q('[data-settings-panel="' + activeSettingsTab + '"]', body);
+        if (!panel) return;
+        panel.replaceChildren();
+
+        if (activeSettingsTab === 'general') renderSettingsGeneral(panel);
+        else if (activeSettingsTab === 'thinking') renderSettingsThinking(panel);
+        else if (activeSettingsTab === 'scrolling') renderSettingsScrolling(panel);
+        else if (activeSettingsTab === 'display') renderSettingsDisplay(panel);
+        else if (activeSettingsTab === 'diagnostics') renderSettingsDiagnostics(panel);
+    }
+
+    function toggleRowModal(parent, label, value, onChange) {
+        const row = document.createElement('div');
+        row.className = 'cc-row';
+        row.appendChild(document.createElement('span'));
+        row.firstElementChild.className = 'cc-label';
+        row.firstElementChild.textContent = label;
+
+        const button = document.createElement('button');
+        button.className = 'cc-toggle' + (value ? ' cc-on' : '');
+        button.type = 'button';
+        button.setAttribute('role', 'switch');
+        button.setAttribute('aria-checked', String(!!value));
+        button.setAttribute('aria-label', label);
+
+        const knob = document.createElement('span');
+        knob.className = 'cc-knob';
+        button.appendChild(knob);
+        row.appendChild(button);
+        parent.appendChild(row);
+
+        button.addEventListener('click', () => {
+            const next = !value;
+            const accepted = onChange(next);
+            if (accepted === false) return;
+
+            value = next;
+            button.classList.toggle('cc-on', value);
+            button.setAttribute('aria-checked', String(value));
+        });
+
+        return row;
+    }
+
+    function valueRowModal(parent, label, value, promptText, validate, onSave) {
+        const row = document.createElement('div');
+        row.className = 'cc-row cc-clickable';
+        row.tabIndex = 0;
+        row.setAttribute('role', 'button');
+
+        const labelEl = document.createElement('span');
+        labelEl.className = 'cc-label';
+        labelEl.textContent = label;
+        row.appendChild(labelEl);
+
+        const valueEl = document.createElement('span');
+        valueEl.className = 'cc-value';
+        valueEl.textContent = String(value);
+        row.appendChild(valueEl);
+        parent.appendChild(row);
+
+        const edit = () => {
+            const input = prompt(promptText, String(value));
+            if (input === null) return;
+
+            const result = validate(input);
+            if (result === null || result === undefined || result === false) {
+                toast('Invalid value.', true);
+                return;
+            }
+
+            onSave(result);
+            renderSettingsModal();
+        };
+
+        row.addEventListener('click', edit);
+        row.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                edit();
+            }
+        });
+
+        return row;
+    }
+
+    function infoRowModal(parent, label, value) {
+        const row = document.createElement('div');
+        row.className = 'cc-row';
+
+        const labelEl = document.createElement('span');
+        labelEl.className = 'cc-label';
+        labelEl.textContent = label;
+        row.appendChild(labelEl);
+
+        const valueEl = document.createElement('span');
+        valueEl.className = 'cc-muted-value';
+        valueEl.textContent = value;
+        row.appendChild(valueEl);
+        parent.appendChild(row);
+        return row;
+    }
+
+    function renderSettingsGeneral(parent) {
+        valueRowModal(parent, 'Visible messages', cfg.keepMessages,
+            'Number of newest messages to keep visible (1–500):',
+            value => {
+                const n = Number(value);
+                return Number.isInteger(n) && n >= 1 && n <= 500 ? n : null;
+            },
+            value => { setting('keepMessages', value); rerunAfterSetting(); renderSettingsModal(); }
+        );
+
+        toggleRowModal(parent, 'Virtualize messages', cfg.virtualize, value => {
+            setting('virtualize', value);
+            rerunAfterSetting();
+            renderSettingsModal();
+        });
+
+        toggleRowModal(parent, 'Flatten Shiki code', cfg.flattenCode, value => {
+            setting('flattenCode', value);
+            rerunAfterSetting();
+            renderSettingsModal();
+        });
+    }
+
+    function renderSettingsThinking(parent) {
+        toggleRowModal(parent, 'Collapse old thinking', cfg.thinkingMode === 'collapse', value => {
+            if (value) setThinkingMode('collapse');
+            else {
+                cfg.thinkingMode = 'collapse';
+                setThinkingMode('expand');
+            }
+            renderSettingsModal();
+        });
+
+        toggleRowModal(parent, 'Keep thoughts expanded', cfg.thinkingMode === 'expand', value => {
+            if (value) setThinkingMode('expand');
+            else setThinkingMode('collapse');
+            renderSettingsModal();
+        });
+
+        toggleRowModal(parent, 'Hide thinking entirely', cfg.thinkingMode === 'hide', value => {
+            if (value) setThinkingMode('hide');
+            else setThinkingMode('collapse');
+            renderSettingsModal();
+        });
+    }
+
+    function renderSettingsScrolling(parent) {
+        toggleRowModal(parent, 'Auto-scroll', cfg.autoScroll, value => {
+            setting('autoScroll', value);
+            rerunAfterSetting();
+            renderSettingsModal();
+        });
+
+        toggleRowModal(parent, 'Smooth scrolling', cfg.smoothScroll, value => {
+            setting('smoothScroll', value);
+            rerunAfterSetting();
+            renderSettingsModal();
+        });
+
+        valueRowModal(parent, 'Scroll threshold', cfg.scrollThreshold + ' px',
+            'Scroll threshold in pixels (20–500):',
+            value => {
+                const n = Number(value);
+                return Number.isFinite(n) && n >= 20 && n <= 500 ? Math.round(n) : null;
+            },
+            value => { setting('scrollThreshold', value); rerunAfterSetting(); renderSettingsModal(); }
+        );
+    }
+
+    function renderSettingsDisplay(parent) {
+        toggleRowModal(parent, 'Compact mode', cfg.compactMode, value => {
+            setting('compactMode', value);
+            rerunAfterSetting();
+            renderSettingsModal();
+        });
+
+        valueRowModal(parent, 'Font size', cfg.fontSize + ' px',
+            'Font size in pixels (0 = inherit, 10–24):',
+            value => {
+                const n = Number(value);
+                return Number.isInteger(n) && (n === 0 || (n >= 10 && n <= 24)) ? n : null;
+            },
+            value => { setting('fontSize', value); rerunAfterSetting(); renderSettingsModal(); }
+        );
+
+        toggleRowModal(parent, 'Hide Composer', cfg.hideComposer, value => {
+            return toggleComposerVisibility(value);
+        });
+
+        toggleRowModal(parent, 'Eye toggle (hide non-userscript UI)', cfg.eyeToggle, value => {
+            cfg.eyeToggle = value;
+            saveConfig();
+            updateDynamicCSS();
+            if (cfg.eyeToggle) applyEyeToggle();
+            else restoreEyeToggle();
+            renderSettingsModal();
+            toast(cfg.eyeToggle ? 'Non-userscript UI hidden' : 'All UI restored');
+        });
+
+        toggleRowModal(parent, 'Auto-click "page updated" banner', cfg.autoClickPageUpdated, value => {
+            cfg.autoClickPageUpdated = value;
+            saveConfig();
+            renderSettingsModal();
+        });
+
+        toggleRowModal(parent, 'Auto-click Continue after PR merge', cfg.autoClickContinue, value => {
+            cfg.autoClickContinue = value;
+            saveConfig();
+            renderSettingsModal();
+        });
+
+        toggleRowModal(parent, 'Text mode (hide code, show descriptions)', cfg.textMode, value => {
+            cfg.textMode = value;
+            saveConfig();
+            updateDynamicCSS();
+            applyTextMode();
+            renderSettingsModal();
+            toast(cfg.textMode ? 'Text mode enabled' : 'Text mode disabled');
+        });
+    }
+
+    function renderSettingsDiagnostics(parent) {
+        infoRowModal(parent, 'PR state', prState);
+        infoRowModal(parent, 'Composer', findComposer() ? 'Found' : 'Not found');
+        infoRowModal(parent, 'Virtualization', cfg.virtualize ? 'Enabled' : 'Disabled');
+        infoRowModal(parent, 'Thinking mode', cfg.thinkingMode);
+        infoRowModal(parent, 'Eye toggle', cfg.eyeToggle ? 'On' : 'Off');
+
+        const reset = document.createElement('button');
+        reset.className = 'cc-reset';
+        reset.type = 'button';
+        reset.textContent = 'Reset all settings';
+        reset.addEventListener('click', () => {
+            if (!confirm('Reset all Coding Edition settings to defaults?')) return;
+
+            Object.assign(cfg, DEFAULTS);
+            prState = 'none';
+            saveConfig();
+            restoreComposer();
+            restoreEyeToggle();
+            updateDynamicCSS();
+            rerunAfterSetting();
+            renderSettingsModal();
+            toast('Settings reset to defaults.');
+        });
+
+        const resetSection = document.createElement('section');
+        resetSection.className = 'cc-section';
+        resetSection.appendChild(reset);
+        parent.appendChild(resetSection);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
     // DRAWER STATE
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
 
     function openDrawer() {
         if (!drawer || !drawer.isConnected) createDrawer();
@@ -1723,6 +2686,7 @@
                 if (event.button !== 0) return;
                 if (drawer?.contains(event.target)) return;
                 if (toggleButton?.contains(event.target)) return;
+                if (settingsModal?.contains(event.target)) return;
                 closeDrawer();
             };
 
@@ -1765,9 +2729,9 @@
 
     document.addEventListener('keydown', onKeyDown, true);
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
     // UI HELPERS
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
 
     function el(tag, className, text) {
         const node = document.createElement(tag);
@@ -1856,9 +2820,11 @@
         return row;
     }
 
-    function actionItem(parent, icon, label, handler) {
-        const button = el('button', 'cc-action');
+    function actionItem(parent, icon, label, handler, disabled = false) {
+        const button = el('button', 'cc-action' + (disabled ? ' cc-action-disabled' : ''));
         button.type = 'button';
+        button.disabled = disabled;
+        button.setAttribute('aria-disabled', String(disabled));
         button.appendChild(el('span', 'cc-action-icon', icon));
         button.appendChild(el('span', '', label));
         button.addEventListener('click', handler);
@@ -1877,9 +2843,9 @@
         schedule();
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
     // RENDER TABS
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
 
     function renderSettings(parent) {
         let card = section(parent, 'Virtualization');
@@ -1903,80 +2869,6 @@
             rerunAfterSetting();
         });
 
-        card = section(parent, 'Thinking blocks');
-
-        toggleRow(card, 'Collapse old thinking', cfg.thinkingMode === 'collapse', value => {
-            if (value) setThinkingMode('collapse');
-            else {
-                cfg.thinkingMode = 'collapse';
-                setThinkingMode('expand');
-            }
-        });
-
-        toggleRow(card, 'Keep thoughts expanded', cfg.thinkingMode === 'expand', value => {
-            if (value) setThinkingMode('expand');
-            else setThinkingMode('collapse');
-        });
-
-        toggleRow(card, 'Hide thinking entirely', cfg.thinkingMode === 'hide', value => {
-            if (value) setThinkingMode('hide');
-            else setThinkingMode('collapse');
-        });
-
-        card = section(parent, 'Scrolling');
-
-        toggleRow(card, 'Auto-scroll', cfg.autoScroll, value => {
-            setting('autoScroll', value);
-            rerunAfterSetting();
-        });
-
-        toggleRow(card, 'Smooth scrolling', cfg.smoothScroll, value => {
-            setting('smoothScroll', value);
-            rerunAfterSetting();
-        });
-
-        valueRow(card, 'Scroll threshold', cfg.scrollThreshold + ' px',
-            'Scroll threshold in pixels (20–500):',
-            value => {
-                const n = Number(value);
-                return Number.isFinite(n) && n >= 20 && n <= 500 ? Math.round(n) : null;
-            },
-            value => { setting('scrollThreshold', value); rerunAfterSetting(); }
-        );
-
-        card = section(parent, 'Display');
-
-        toggleRow(card, 'Compact mode', cfg.compactMode, value => {
-            setting('compactMode', value);
-            rerunAfterSetting();
-        });
-
-        valueRow(card, 'Font size', cfg.fontSize + ' px',
-            'Font size in pixels (0 = inherit, 10–24):',
-            value => {
-                const n = Number(value);
-                return Number.isInteger(n) && (n === 0 || (n >= 10 && n <= 24)) ? n : null;
-            },
-            value => { setting('fontSize', value); rerunAfterSetting(); }
-        );
-
-        card = section(parent, 'Interface');
-
-        valueRow(card, 'Context window', formatNumber(cfg.contextWindow),
-            'Context window size in tokens:',
-            value => {
-                const n = Number(value);
-                return Number.isSafeInteger(n) && n >= 1000 && n <= 100_000_000 ? n : null;
-            },
-            value => { setting('contextWindow', value); rerunAfterSetting(); }
-        );
-
-        valueRow(card, 'Composer selector', cfg.composerSelector || 'Auto-detect',
-            'Custom CSS selector for composer (blank = auto-detect):',
-            value => String(value).trim(),
-            value => { setting('composerSelector', value); rerunAfterSetting(); }
-        );
-
         card = section(parent, 'Status');
 
         const found = orderedMessages(currentLog);
@@ -1986,6 +2878,8 @@
         infoRow(card, 'Composer', findComposer() ? 'Found' : 'Not found');
         infoRow(card, 'Virtualization', cfg.virtualize ? 'Enabled' : 'Disabled');
         infoRow(card, 'Thinking mode', cfg.thinkingMode);
+        infoRow(card, 'Eye toggle', cfg.eyeToggle ? 'On' : 'Off');
+        infoRow(card, 'PR state', prState);
 
         const reset = el('button', 'cc-reset', 'Reset all settings');
         reset.type = 'button';
@@ -1993,8 +2887,10 @@
             if (!confirm('Reset all Coding Edition settings to defaults?')) return;
 
             Object.assign(cfg, DEFAULTS);
+            prState = 'none';
             saveConfig();
             restoreComposer();
+            restoreEyeToggle();
             updateDynamicCSS();
             rerunAfterSetting();
             toast('Settings reset to defaults.');
@@ -2006,9 +2902,22 @@
     }
 
     function renderActions(parent) {
-        let card = section(parent, 'Agent');
+        const state = detectPRState();
+        prState = state;
 
-        actionItem(card, '↗', 'Create PR + Merge', createPR);
+        const open = prState === 'open';
+        const merged = prState === 'merged';
+
+        let card = section(parent, 'GITHUB');
+
+        const createBtn = actionItem(card, '📤', 'Create PR', createPR, open || merged);
+        createBtn.id = 'cc-btn-create-pr';
+
+        const mergeBtnEl = actionItem(card, '🔀', 'Merge PR', mergePR, !open);
+        mergeBtnEl.id = 'cc-btn-merge-pr';
+
+        // Sync disabled/aria state now that the buttons exist in the DOM.
+        updatePRButtons();
 
         card = section(parent, 'Session');
 
@@ -2020,7 +2929,7 @@
 
         card = section(parent, 'Export');
 
-        actionItem(card, '⬇', 'Export chat as Markdown', exportChatMarkdown);
+        actionItem(card, '💾', 'Export conversation (HTML)', exportChatHTML);
 
         card = section(parent, 'Debug');
 
@@ -2062,8 +2971,6 @@
         main.appendChild(el('div', 'cc-hero-percent', stats.percentage.toFixed(1) + '%'));
         main.lastElementChild.id = 'cc-context-percent';
 
-        // The displayed hero uses the same live-updated fields as the
-        // one-second refresh, without rebuilding the panel every second.
         numbers.replaceChildren();
         numbers.appendChild(main.firstElementChild);
         numbers.appendChild(main.lastElementChild);
@@ -2128,9 +3035,9 @@
         if (activeTab === 'statistics' && drawerOpen) refreshStatistics();
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
     // CREATE DRAWER
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
 
     function createDrawer() {
         if (!document.documentElement) return;
@@ -2148,14 +3055,54 @@
                     <button class="cc-icon-button" type="button" data-cc-close aria-label="Close panel">×</button>
                 </div>
                 <div class="cc-tabs" role="tablist" aria-label="Coding Edition sections">
-                    <button class="cc-tab cc-active" type="button" role="tab" data-tab="settings">Settings</button>
-                    <button class="cc-tab" type="button" role="tab" data-tab="actions">Actions</button>
-                    <button class="cc-tab" type="button" role="tab" data-tab="statistics">Statistics</button>
+                    <button class="cc-tab cc-active" type="button" role="tab" data-tab="actions">
+                        <span class="cc-tab-icon">📋</span>
+                        <span class="cc-tab-label" aria-hidden="true">Actions</span>
+                    </button>
+                    <button class="cc-tab" type="button" role="tab" data-tab="statistics">
+                        <span class="cc-tab-icon">📊</span>
+                        <span class="cc-tab-label" aria-hidden="true">Statistics</span>
+                    </button>
+                    <button id="cc-eye-toggle" class="cc-tab-gear" type="button" role="switch" aria-pressed="false" aria-label="Hide non-userscript UI (eye open)">👁️</button>
+                    <button class="cc-tab-gear" type="button" data-cc-settings aria-label="Open settings">⚙</button>
                 </div>
                 <div class="cc-content"></div>
             `;
 
             drawer.querySelector('[data-cc-close]').addEventListener('click', closeDrawer);
+
+            drawer.querySelector('[data-cc-settings]').addEventListener('click', (event) => {
+                event.stopPropagation();
+                openSettingsModal();
+            });
+
+            // Wire eye button inside drawer bar.
+            const eyeInDrawer = q('#cc-eye-toggle', drawer);
+            if (eyeInDrawer && eyeInDrawer !== eyeButton) {
+                eyeButton = eyeInDrawer;
+                eyeButton.textContent = cfg.eyeToggle ? '👁️' : '🙈';
+                eyeButton.setAttribute('aria-pressed', String(cfg.eyeToggle));
+                eyeButton.setAttribute('aria-label',
+                    cfg.eyeToggle
+                        ? 'Hide non-userscript UI (eye open)'
+                        : 'Show all UI (eye closed)'
+                );
+                eyeButton.addEventListener('click', () => {
+                    cfg.eyeToggle = !cfg.eyeToggle;
+                    saveConfig();
+                    updateDynamicCSS();
+                    eyeButton.textContent = cfg.eyeToggle ? '👁️' : '🙈';
+                    eyeButton.setAttribute('aria-pressed', String(cfg.eyeToggle));
+                    eyeButton.setAttribute('aria-label',
+                        cfg.eyeToggle
+                            ? 'Hide non-userscript UI (eye open)'
+                            : 'Show all UI (eye closed)'
+                    );
+                    if (cfg.eyeToggle) applyEyeToggle();
+                    else restoreEyeToggle();
+                    toast(cfg.eyeToggle ? 'Non-userscript UI hidden' : 'All UI restored');
+                });
+            }
 
             qa('.cc-tab', drawer).forEach(tab => {
                 tab.addEventListener('click', () => {
@@ -2187,27 +3134,63 @@
         renderDrawer();
     }
 
-    function createExportButton() {
+    // ══════════════════════════════════════════════════════════════════
+    // NAV BAR EXPORT BUTTON (top nav, left of diff viewer)
+    // ══════════════════════════════════════════════════════════════════
+
+    function createNavExportButton() {
         if (!cfg.showExport) {
-            exportButton?.remove();
-            exportButton = null;
+            navExportButton?.remove();
+            navExportButton = null;
             return;
         }
 
-        if (!exportButton || !exportButton.isConnected) {
-            exportButton = el('button');
-            exportButton.id = 'cc-export';
-            exportButton.type = 'button';
-            exportButton.textContent = '⬇ export.md';
-            exportButton.title = 'Export chat as Markdown';
-            exportButton.addEventListener('click', exportChatMarkdown);
-            document.documentElement.appendChild(exportButton);
+        if (navExportButton && navExportButton.isConnected) return;
+
+        navExportButton = document.createElement('button');
+        navExportButton.id = 'cc-nav-export';
+        navExportButton.type = 'button';
+        navExportButton.title = 'Export conversation (HTML)';
+        navExportButton.setAttribute('aria-label', 'Export conversation (HTML)');
+        navExportButton.innerHTML = '<span style="font-size:16px;line-height:1;">💾</span>';
+        navExportButton.addEventListener('click', exportChatHTML);
+
+        // Try to insert immediately to the left of Arena's diff viewer control.
+        const diffViewer = q('[aria-label*="diff" i], [title*="diff" i], button[class*="diff" i], [data-testid*="diff" i]');
+        if (diffViewer && diffViewer.parentElement) {
+            diffViewer.parentElement.insertBefore(navExportButton, diffViewer);
+        } else {
+            // Fallback: attach near the top of the document.
+            document.documentElement.insertBefore(navExportButton, document.documentElement.firstChild);
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    function refreshNavExportButton() {
+        if (!cfg.showExport) {
+            navExportButton?.remove();
+            navExportButton = null;
+            return;
+        }
+
+        if (!navExportButton || !navExportButton.isConnected) {
+            createNavExportButton();
+            return;
+        }
+
+        // If React re-rendered the nav and moved/removed our button, re-insert
+        // beside the diff viewer control.
+        const diffViewer = q('[aria-label*="diff" i], [title*="diff" i], button[class*="diff" i], [data-testid*="diff" i]');
+        if (diffViewer && diffViewer.parentElement) {
+            const currentParent = navExportButton.parentElement;
+            if (currentParent !== diffViewer.parentElement) {
+                diffViewer.parentElement.insertBefore(navExportButton, diffViewer);
+            }
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
     // SCHEDULE + INIT
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
 
     function schedule() {
         clearTimeout(scheduleTimer);
@@ -2218,7 +3201,15 @@
         if (!document.documentElement) return;
 
         createDrawer();
-        createExportButton();
+        createNavExportButton();
+        refreshNavExportButton();
+
+        // Eye toggle state persistence across re-renders.
+        updateDynamicCSS();
+        if (cfg.eyeToggle) {
+            document.documentElement.dataset.ccEye = '1';
+            applyEyeToggle();
+        }
 
         const log = findLog();
 
@@ -2239,7 +3230,7 @@
         }
 
         if (!currentLog) {
-            updateDynamicCSS();
+            updateJumpButton();
             return;
         }
 
@@ -2249,13 +3240,10 @@
 
         virtualize();
         decorateCodeBlocks();
+        applyTextMode();
 
-        // A mode switch can request a forced initial sweep. Otherwise,
-        // only a real message-count increase triggers expansion/collapse.
         dispatchThinkingMode(false);
 
-        // Reapply on every schedule tick: React may have replaced the
-        // composer or its wrapper since the last pass.
         if (cfg.hideComposer && !q('[data-cc-composer-hide="1"]')) {
             applyComposerHide();
         }
@@ -2263,13 +3251,17 @@
         if (cfg.autoScroll) {
             const scroller = scrollElement(currentLog);
             if (scroller && isNearBottom(scroller)) {
-                // Avoid unconditional smooth-scroll animations on every pass.
-                // The MutationObserver handles streaming; this is a recovery.
                 if (increased) scrollToBottom(scroller);
             }
         }
 
         updateJumpButton();
+
+        // Auto-click page-updated banner.
+        watchPageUpdatedBanner();
+
+        // Auto-click Continue button when PR is merged.
+        clickContinueButton();
 
         if (drawerOpen && activeTab === 'statistics') refreshStatistics();
     }
@@ -2314,7 +3306,7 @@
         updateDynamicCSS();
 
         createDrawer();
-        createExportButton();
+        createNavExportButton();
 
         const log = findLog();
         if (log) {
@@ -2324,6 +3316,7 @@
             decorateCodeBlocks();
             dispatchThinkingMode(true);
             if (cfg.hideComposer) applyComposerHide();
+            if (cfg.eyeToggle) applyEyeToggle();
             runSchedule();
         }
 
@@ -2344,13 +3337,18 @@
         clearInterval(maintenanceTimer);
         maintenanceTimer = setInterval(() => {
             if (!drawer?.isConnected || !toggleButton?.isConnected) createDrawer();
-            createExportButton();
+            createNavExportButton();
+            refreshNavExportButton();
 
             if (cfg.hideComposer && !q('[data-cc-composer-hide="1"]')) {
                 applyComposerHide();
             }
 
-            // React may have reconstructed a previously flattened code block.
+            if (cfg.eyeToggle) {
+                document.documentElement.dataset.ccEye = '1';
+                applyEyeToggle();
+            }
+
             schedule();
         }, 5000);
 
@@ -2362,7 +3360,7 @@
         clearInterval(watchdogTimer);
         watchdogTimer = setInterval(() => {
             if (!q('#cc-drawer') || !q('#cc-toggle')) createDrawer();
-            if (cfg.showExport && !q('#cc-export')) createExportButton();
+            if (cfg.showExport && !q('#cc-nav-export')) createNavExportButton();
         }, 3000);
 
         console.info('[CC] Arena.ai Coding Edition v3.4.0 initialized.');
@@ -2400,8 +3398,6 @@
 
         startObserving();
 
-        // Empty/new conversations may not have a log yet. Keep the controls
-        // available after the fallback, then let the watchdog recover.
         setTimeout(() => {
             if (!findLog()) {
                 initialize();
@@ -2410,8 +3406,6 @@
     }
 
     if (document.readyState === 'loading') {
-        // document-start: CSS is installed immediately; log detection uses
-        // MutationObserver rather than waiting for a textarea or form.
         waitForLog();
     } else {
         waitForLog();
