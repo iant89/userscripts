@@ -443,26 +443,61 @@
 		}
 	}
 
-	function actionClearChat() {
-		// Strategy 1: find a "new chat"/"+" button anywhere visible
-		const patterns = ["new chat", "new conversation", "start new", "clear chat", "reset chat", "plus", "compose"];
-		const buttons = document.querySelectorAll('button, [role="button"], a');
-		for (const el of buttons) {
-			const txt = ((el.textContent || "") + " " + (el.getAttribute("aria-label") || "") + " " + (el.getAttribute("data-testid") || "") + " " + (el.getAttribute("title") || "")).trim().toLowerCase();
-			if (!txt) continue;
-			if (patterns.some(p => txt.includes(p))) {
-				const r = el.getBoundingClientRect();
-				if (r.width === 0 || r.height === 0) continue;
-				el.click();
-				toast(`Clicked "${(el.textContent || "").trim().slice(0, 30) || "new chat"}".`, "success");
-				return;
-			}
+	async function actionClearChat() {
+	const container = getContainer();
+	const before = container ? getMessages(container).length : 0;
+
+	if (before === 0) {
+		toast("Chat is already empty.", "info");
+		return;
+	}
+
+	// Step 1: try to find and click a "New chat" button
+	const btn = findNewChatButton();
+	let clickedLabel = null;
+
+	if (btn) {
+		const label =
+			(btn.textContent || "").trim().slice(0, 40) ||
+			btn.getAttribute("aria-label") ||
+			btn.getAttribute("title") ||
+			btn.getAttribute("data-testid") ||
+			"(icon button)";
+
+		try {
+			btn.click();
+			clickedLabel = label;
+			toast(`Clicked "${label}" — waiting…`, "info", 1000);
+		} catch (e) {
+			console.warn("[Coding Edition] New-chat click threw:", e);
 		}
-		// Fallback: navigate
-		if (confirm("Could not find a 'New chat' button. Navigate to a fresh chat? (Current conversation will be left.)")) {
-			location.href = "/";
+
+		// Verify the click actually did something
+		await new Promise((r) => setTimeout(r, 900));
+		const after = getContainer() ? getMessages(getContainer()).length : 0;
+		if (after < before || after === 0) {
+			toast(`Cleared (${before} → ${after}).`, "success");
+			return;
+		}
+		console.log("[Coding Edition] Clear-click no-op:", { before, after });
+	}
+
+	// Step 2: hard navigation fallback
+	const why = clickedLabel
+		? `Clicked "${clickedLabel}" but the chat wasn't cleared (${before} messages still there).`
+		: `No "New chat" button found in the sidebar (${before} messages present).`;
+
+	toast(why, "error", 4000);
+	await new Promise((r) => setTimeout(r, 400));
+
+	if (confirm(`${why}\n\nReload to a fresh chat? Your current conversation stays in your history.`)) {
+		try {
+			location.assign("/");
+		} catch (_) {
+			location.reload();
 		}
 	}
+}
 
 	async function actionDiagnostics() {
 		const out = [];
