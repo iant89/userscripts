@@ -1,4 +1,4 @@
-/* ══════════════════════════════════════════════════════════════════
+══════════════════════════════════════════════════════════════════
  * Arena.ai | Coding Edition
  * Version: 3.4.0
  * ══════════════════════════════════════════════════════════════════
@@ -565,6 +565,7 @@ let lastContinueClick = 0;
             transform:translate(-50%,-50%) scale(0.96);
             z-index:2147483648;
             width:min(640px,92vw);
+            min-height:350px;
             max-height:min(760px,92vh);
             background:var(--cc-bg);
             border:1px solid var(--cc-border);
@@ -580,6 +581,7 @@ let lastContinueClick = 0;
         }
 
         #cc-settings-modal.cc-visible {
+            display:block;
             opacity:1;
             pointer-events:auto;
             transform:translate(-50%,-50%) scale(1);
@@ -653,6 +655,14 @@ let lastContinueClick = 0;
         }
 
         #cc-settings-modal .cc-modal-tab:hover { color:var(--cc-text); }
+
+        #cc-settings-modal .cc-modal-panel {
+            flex:1;
+            display:flex;
+            flex-direction:column;
+            gap:18px;
+            min-height:300px;
+        }
 
         #cc-settings-modal .cc-modal-body {
             flex:1;
