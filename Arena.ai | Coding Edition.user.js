@@ -499,6 +499,71 @@
 	}
 }
 
+function findNewChatButton() {
+	const all = document.querySelectorAll('button, [role="button"], a, [role="menuitem"]');
+
+	// Safe patterns only — generic words like "plus"/"compose" cause false matches
+	const textPatterns = [
+		"new chat",
+		"new conversation",
+		"start new chat",
+		"start new conversation",
+		"new thread",
+		"new session",
+		"clear chat",
+		"clear conversation",
+		"reset chat",
+		"create new chat",
+		"create chat",
+	];
+
+	const candidates = [];
+
+	for (const el of all) {
+		// Never match anything inside the message log (user might write "new chat")
+		if (el.closest('[role="log"]')) continue;
+
+		const text = (el.textContent || "").trim().toLowerCase();
+		const aria = (el.getAttribute("aria-label") || "").toLowerCase();
+		const title = (el.getAttribute("title") || "").toLowerCase();
+		const testid = (el.getAttribute("data-testid") || "").toLowerCase();
+		const combined = `${text} ${aria} ${title} ${testid}`;
+
+		const hasMatch = textPatterns.some((p) => combined.includes(p));
+		if (!hasMatch) continue;
+
+		const r = el.getBoundingClientRect();
+		if (r.width === 0 || r.height === 0) continue;
+
+		// Score the candidate
+		let score = 1;
+		if (text.length > 0) score += 5;           // has visible text
+		if (el.closest('aside, nav, [class*="sidebar" i], [data-sidebar], [role="navigation"]')) score += 5; // in sidebar
+		if (r.top < 250) score += 3;               // near the top of the page
+		if (el.tagName === "A") score += 1;        // links navigate reliably
+
+		candidates.push({
+			el,
+			score,
+			label: (text || aria || title || testid).slice(0, 40),
+		});
+	}
+
+	candidates.sort((a, b) => b.score - a.score);
+
+	if (candidates[0]) {
+		console.log(
+			"[Coding Edition] Clear-chat candidate:",
+			candidates[0].label,
+			"(score:", candidates[0].score + ")",
+		);
+	} else {
+		console.warn("[Coding Edition] No clear-chat button found. Run Diagnostics.");
+	}
+
+	return candidates[0]?.el || null;
+}
+
 	async function actionDiagnostics() {
 		const out = [];
 		out.push("=== Coding Edition Diagnostics ===");
