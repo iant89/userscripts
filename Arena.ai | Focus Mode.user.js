@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Arena.ai | Focus Mode
 // @namespace    https://arena.ai/
-// @version      1.3.0
+// @version      1.4.0
 // @author       Piknockyou (vibe-coded)
 // @license      AGPL-3.0
 // @description  Keeps an Arena conversation flowing: sticky auto-scroll that pauses the moment you interact and resumes when you click Arena's scroll-down arrow, locked zoom, a navbar pinned to the top, a composer pinned to the bottom and widened to fit the viewport, the diff viewer widened to fit it too, a flattened/optimized DOM, and one-click HTML export of the whole conversation (theme + layout preserved, folding still works).
@@ -14,7 +14,7 @@
 // ==/UserScript==
 
 /* ══════════════════════════════════════════════════════════════════
- * Arena.ai | Focus Mode — v1.3.0
+ * Arena.ai | Focus Mode — v1.4.0
  * ══════════════════════════════════════════════════════════════════
  *
  * A deliberately small script with four jobs:
@@ -47,6 +47,11 @@
  *                active theme, and a tiny vanilla shim that keeps the
  *                reasoning / tool-output folds (Radix collapsibles and
  *                native <details>) working in the exported file.
+ *
+ *   5. REVIEW    Arena's "Was this task successful?" panel is detected by
+ *                its close button ("Close review panel") or its header
+ *                text, and its "Yes" action is clicked for you, once per
+ *                panel, so reviews never stall a session.
  *
  * Plus DOM optimisation: Shiki code blocks are flattened from tens of
  * thousands of spans to plain text, empty inline wrappers are unwrapped,
@@ -81,6 +86,10 @@
         wideComposer: true,     // composer spans the full viewport width
         pinTopNav: true,        // top navbar stays on the top edge
         wideDiffViewer: true,   // diff viewer spans the full viewport width
+
+        // Task review prompt ("Was this task successful?")
+        autoConfirmTaskReview: true, // click "Yes" when the review panel opens
+        reviewClickDelay: 150,       // ms to let the panel finish mounting
 
         // DOM optimisation
         optimizeDOM: true,
@@ -1410,6 +1419,225 @@
     }
 
     // ════════════════════════════════════════════════════════════════
+    // 2d. TASK REVIEW PANEL ("Was this task successful?")
+    // ════════════════════════════════════════════════════════════════
+
+    // Arena renders a small prompt:
+    //   <span class="body-sm font-book text-text-primary">Was this task successful?</span>
+    //   <kbd>Esc</kbd><button aria-label="Close review panel">✕</button>
+    // plus "Yes" / "No" actions. The close button is the cheapest anchor;
+    // the header text is the fallback when the label changes.
+    const REVIEW_PROMPT =
+        /was this (task|response|answer|conversation|run|session|result)\s+(successful|helpful|good|useful)\b|did (this|the) (task|response|answer)\s+(succeed|work)|was the (task|response|answer)\s+(successful|helpful)/i;
+
+    const REVIEW_ANCHOR = /(close|dismiss|hide)\s+(the\s+)?(task\s+)?(review|rating|feedback)|review\s+panel|task\s+review/i;
+
+    const REVIEW_CONTAINERS = [
+        '[role="dialog"]',
+        '[class*="modal" i]',
+        '[class*="dialog" i]',
+        '[class*="popover" i]',
+        '[class*="panel" i]',
+        '[class*="drawer" i]',
+        '[class*="sheet" i]',
+        '[class*="toast" i]',
+        '[class*="review" i]',
+        '[id*="review" i]',
+        '[data-testid*="review" i]',
+        '[data-testid*="rating" i]',
+    ];
+
+    const review = { lastPanel: null, lastClickAt: 0, count: 0, timer: 0 };
+    const MAX_REVIEW_CLICKS = 20; // safety valve, one per prompt in practice
+
+    function hasReviewPrompt(el) {
+        const content = text(el);
+        if (!content) return false;
+        return REVIEW_PROMPT.test(content.slice(0, 2000));
+    }
+
+    function reviewPanelShaped(el) {
+        if (!isElement(el) || isOurs(el)) return false;
+        if (!isVisible(el)) return false;
+        if (el.querySelector('[role="log"]')) return false; // that is the page, not the prompt
+        const rect = el.getBoundingClientRect();
+        if (rect.width < 140 || rect.height < 36) return false;
+        const viewportWide = rect.width > viewportWidth() * 0.9;
+        const viewportTall = rect.height > viewportBottom() * 0.9;
+        if (viewportWide && viewportTall) return false;
+        return true;
+    }
+
+    /** Every label an element can be addressed by, normalised. */
+    function labelsOf(el) {
+        if (!isElement(el)) return [];
+        return [
+            el.getAttribute('aria-label'),
+            el.getAttribute('title'),
+            text(el),
+        ]
+            .filter(Boolean)
+            .map((value) => value.replace(/\s+/g, ' ').trim().toLowerCase())
+            .filter(Boolean);
+    }
+
+    /** First meaningful label, for diagnostics. */
+    function yesLabelOf(el) {
+        return labelsOf(el)[0] || '';
+    }
+
+    /** "Yes", "Yes!", "✓ Yes" — never "Yes, but …" and never "No". */
+    function isYesControl(el) {
+        return labelsOf(el).some((label) =>
+            label.length <= 32 && /^(?:[\u2713\u2714\u{1F44D}]\s*)?yes\b[\s!.]*$/u.test(label));
+    }
+
+    function findYesButton(panel) {
+        if (!panel) return null;
+        for (const el of panel.querySelectorAll('button, [role="button"], [role="radio"], label, a')) {
+            if (isOurs(el) || !isVisible(el)) continue;
+            if (isYesControl(el)) return el;
+        }
+        return null;
+    }
+
+    /** Climb from the close button/header to the smallest box holding a Yes. */
+    function reviewContainerFrom(el) {
+        let node = el;
+        let lastPanelLike = null;
+        for (let depth = 0; node && depth < 8; depth++, node = node.parentElement) {
+            if (node === document.body || node === document.documentElement) break;
+            if (node.querySelector('[role="log"]')) break;
+            if (reviewPanelShaped(node) && hasReviewPrompt(node)) lastPanelLike = node;
+            if (findYesButton(node)) {
+                // Only accept a box that actually carries the prompt text.
+                if (hasReviewPrompt(node) && reviewPanelShaped(node)) return node;
+                return lastPanelLike;
+            }
+        }
+        return lastPanelLike;
+    }
+
+    function findReviewPanel() {
+        // 1. Anchor on the review close button.
+        for (const anchor of $$('[aria-label*="review" i], [title*="review" i]')) {
+            if (isOurs(anchor) || !isVisible(anchor)) continue;
+            const label = anchor.getAttribute('aria-label') || anchor.getAttribute('title') || '';
+            if (!REVIEW_ANCHOR.test(label)) continue;
+            const panel = reviewContainerFrom(anchor);
+            if (panel && reviewPanelShaped(panel)) return panel;
+        }
+
+        // 2. Header text inside a panel-shaped container: smallest match wins.
+        let best = null;
+        let bestArea = Infinity;
+        const seen = new Set();
+        for (const selector of REVIEW_CONTAINERS) {
+            for (const el of $$(selector)) {
+                if (seen.has(el)) continue;
+                seen.add(el);
+                if (!reviewPanelShaped(el) || !hasReviewPrompt(el)) continue;
+                const rect = el.getBoundingClientRect();
+                if (!findYesButton(el)) continue;
+                const area = rect.width * rect.height;
+                if (area < bestArea) {
+                    best = el;
+                    bestArea = area;
+                }
+            }
+        }
+        return best;
+    }
+
+    function confirmTaskReview() {
+        if (!CFG.autoConfirmTaskReview) return false;
+        if (review.count >= MAX_REVIEW_CLICKS) return false;
+
+        const panel = findReviewPanel();
+        if (!panel) return false;
+
+        const yes = findYesButton(panel);
+        if (!yes) return false;
+
+        // If the same panel is still open after our click, retry only after a
+        // grace period (usually it closes immediately and we never get here).
+        const now = performance.now();
+        if (panel === review.lastPanel && now - review.lastClickAt < 4000) return false;
+
+        review.lastPanel = panel;
+        review.lastClickAt = now;
+        review.count++;
+
+        try {
+            yes.click();
+            log('task review: clicked "Yes"');
+            return true;
+        } catch (error) {
+            console.error('[FocusMode] Could not confirm the task review:', error);
+            return false;
+        }
+    }
+
+    function scheduleReviewCheck() {
+        if (!CFG.autoConfirmTaskReview) return;
+        if (review.timer) clearTimeout(review.timer);
+        review.timer = setTimeout(() => {
+            review.timer = 0;
+            confirmTaskReview();
+        }, Math.max(0, CFG.reviewClickDelay));
+    }
+
+    /** Verbose diagnostics for the review-panel detection (console only). */
+    function debugReview() {
+        const report = {
+            enabled: CFG.autoConfirmTaskReview,
+            clicks: review.count,
+            anchors: [],
+            promptMatches: [],
+            chosen: null,
+            yes: null,
+        };
+
+        for (const el of $$('[aria-label*="review" i], [title*="review" i]')) {
+            report.anchors.push({
+                label: el.getAttribute('aria-label') || el.getAttribute('title'),
+                visible: isVisible(el),
+                container: (() => {
+                    const box = reviewContainerFrom(el);
+                    return box ? { cls: (classish(box) || '').slice(0, 100), text: text(box).slice(0, 80) } : null;
+                })(),
+            });
+        }
+
+        const seen = new Set();
+        for (const selector of REVIEW_CONTAINERS) {
+            for (const el of $$(selector)) {
+                if (seen.has(el)) continue;
+                seen.add(el);
+                if (!hasReviewPrompt(el)) continue;
+                const rect = el.getBoundingClientRect();
+                report.promptMatches.push({
+                    selector,
+                    cls: (classish(el) || '').slice(0, 100),
+                    rect: [rect.top, rect.left, rect.width, rect.height],
+                    shaped: reviewPanelShaped(el),
+                    hasYes: !!findYesButton(el),
+                });
+            }
+        }
+
+        const panel = findReviewPanel();
+        if (panel) {
+            report.chosen = { cls: (classish(panel) || '').slice(0, 100), text: text(panel).slice(0, 120) };
+            const yes = findYesButton(panel);
+            if (yes) report.yes = { label: yesLabelOf(yes), tag: yes.tagName.toLowerCase() };
+        }
+
+        console.log('[FocusMode] task review report', report);
+        return report;
+    }
+
+    // ════════════════════════════════════════════════════════════════
     // 3. DOM OPTIMISATION
     // ════════════════════════════════════════════════════════════════
 
@@ -1979,14 +2207,32 @@ clone.outerHTML + '\n' +
         if (CFG.pinComposer || CFG.wideComposer) ensureComposerPinned();
         ensureTopBarPinned();
         ensureDiffViewerWide();
+        scheduleReviewCheck();
         if (CFG.showExportButton) ensureExportButton();
         scheduleFollow();
+    }
+
+    /** Review prompts are portalled into <body>; react as soon as one lands. */
+    function installReviewWatcher() {
+        if (!CFG.autoConfirmTaskReview) return;
+        const observer = new MutationObserver((records) => {
+            for (const record of records) {
+                for (const node of record.addedNodes) {
+                    if (!isElement(node)) continue;
+                    if (node.matches('script, style, link')) continue;
+                    scheduleReviewCheck();
+                    return;
+                }
+            }
+        });
+        observer.observe(document.body, { childList: true });
     }
 
     function boot() {
         injectCSS();
         if (CFG.preventZoom) installZoomLock();
         installFollowListeners();
+        installReviewWatcher();
 
         scan();
         // Arena is a SPA: poll for the log / composer / nav to appear, move,
@@ -2018,12 +2264,17 @@ clone.outerHTML + '\n' +
         export: exportConversation,
         /** Print what the diff/workspace panel detection sees. */
         debugDiff: debugDiffPanel,
+        /** Click "Yes" on the task review panel if it is open right now. */
+        confirmReview: () => confirmTaskReview(),
+        /** Print what the task-review panel detection sees. */
+        debugReview: debugReview,
         config: CFG,
         _internals: {
             findComposer, findComposerBar, ensureComposerPinned, composer,
             findTopBar, ensureTopBarPinned, widenComposer, topbar,
             findDiffPanel, ensureDiffViewerWide, applyDiffWidth, diffview,
             findWorkspaceToggle, debugDiffPanel,
+            findReviewPanel, findYesButton, confirmTaskReview, debugReview,
         },
     };
 })();
