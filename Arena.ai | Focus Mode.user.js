@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Arena.ai | Focus Mode
 // @namespace    https://arena.ai/
-// @version      1.0.0
+// @version      1.2.0
 // @author       Piknockyou (vibe-coded)
 // @license      AGPL-3.0
-// @description  Keeps an Arena conversation flowing: sticky auto-scroll that pauses the moment you interact and resumes when you click Arena's scroll-down arrow, locked zoom, a composer pinned to the bottom of the viewport, a flattened/optimized DOM, and one-click HTML export of the whole conversation (theme + layout preserved, folding still works).
+// @description  Keeps an Arena conversation flowing: sticky auto-scroll that pauses the moment you interact and resumes when you click Arena's scroll-down arrow, locked zoom, a navbar pinned to the top, a composer pinned to the bottom and widened to fit the viewport, the diff viewer widened to fit it too, a flattened/optimized DOM, and one-click HTML export of the whole conversation (theme + layout preserved, folding still works).
 // @match        *://*.arena.ai/*
 // @match        *://*.canaryarena.ai/*
 // @match        *://chat.lmsys.org/*
@@ -14,7 +14,7 @@
 // ==/UserScript==
 
 /* ══════════════════════════════════════════════════════════════════
- * Arena.ai | Focus Mode — v1.0.0
+ * Arena.ai | Focus Mode — v1.2.0
  * ══════════════════════════════════════════════════════════════════
  *
  * A deliberately small script with four jobs:
@@ -31,10 +31,14 @@
  *                two-finger pinch and the viewport meta tag are all
  *                neutralised so the layout can never balloon.
  *
- *   3. COMPOSER  The composer bar is made to stay on the bottom edge of
- *                the viewport. Sticky first; if the container makes
- *                sticky impossible it falls back to a measured fixed
- *                pin, with the log padded so nothing hides underneath.
+ *   3. CHROME    The composer bar is made to stay on the bottom edge of
+ *                the viewport and to span the full viewport width, the
+ *                top navbar is made to stay on the top edge, and the diff
+ *                viewer is widened to the viewport too. The bar and the
+ *                navbar use sticky first and fall back to a measured
+ *                fixed pin with space reserved, so nothing hides
+ *                underneath; the diff viewer is measured and widened in
+ *                place, whether it floats or sits in the layout.
  *
  *   4. EXPORT    A download icon is inserted in the top nav directly to
  *                the left of Arena's diff-browser control. It writes a
@@ -72,8 +76,11 @@
         // Zoom
         preventZoom: true,
 
-        // Composer
+        // Viewport chrome
         pinComposer: true,
+        wideComposer: true,     // composer spans the full viewport width
+        pinTopNav: true,        // top navbar stays on the top edge
+        wideDiffViewer: true,   // diff viewer spans the full viewport width
 
         // DOM optimisation
         optimizeDOM: true,
@@ -210,6 +217,38 @@
                 bottom: 0 !important;
                 z-index: 30 !important;
             }
+            [data-afx-wide="1"] {
+                max-width: none !important;
+                width: 100% !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+            }
+
+            /* ── Diff viewer spans the viewport width ── */
+            [data-afx-diff="1"] {
+                max-width: none !important;
+                min-width: 0 !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+            }
+            [data-afx-diff="1"][data-afx-diff-floating="1"] {
+                right: auto !important;
+                max-width: none !important;
+            }
+            [data-afx-diff="1"] [data-afx-diff-wide="1"] {
+                max-width: none !important;
+                width: 100% !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+            }
+
+            /* ── Top navbar stays on the top edge of the viewport ── */
+            [data-afx-topbar="1"] {
+                position: sticky !important;
+                top: 0 !important;
+                z-index: 40 !important;
+            }
+            [data-afx-topbar="1"][data-afx-top-pinned="1"] { z-index: 60 !important; }
 
             /* ── Nav export button (looks like Arena's own icon buttons) ── */
             #${AFX.exportBtnId} {
@@ -641,7 +680,11 @@
             if (!nearBottom(follow.scroller)) stickToBottom();
         }, Math.max(200, CFG.idleFollowPoll));
 
-        window.addEventListener('resize', () => scheduleFollow(), { passive: true });
+        window.addEventListener('resize', () => {
+            scheduleFollow();
+            syncTopBarPin();
+            syncDiffViewerWidth();
+        }, { passive: true });
         if (window.visualViewport) {
             window.visualViewport.addEventListener('resize', () => scheduleFollow(), { passive: true });
         }
@@ -682,15 +725,30 @@
         return best;
     }
 
+    function viewportWidth() {
+        return document.documentElement.clientWidth || window.innerWidth;
+    }
+
+    /** Left/width for a pinned composer: full viewport when asked to fit it. */
+    function composerBox(rect) {
+        if (CFG.wideComposer) return { left: 0, width: viewportWidth() };
+        if (!rect) return null;
+        return { left: Math.round(rect.left), width: Math.round(rect.width) };
+    }
+
     function applyFixedPin(bar, rect) {
         composer.pinned = true;
         bar.dataset.afxPinned = '1';
         bar.style.setProperty('position', 'fixed', 'important');
         bar.style.setProperty('z-index', '45', 'important');
         bar.style.setProperty('box-sizing', 'border-box', 'important');
-        if (rect) {
-            bar.style.setProperty('left', Math.round(rect.left) + 'px', 'important');
-            bar.style.setProperty('width', Math.round(rect.width) + 'px', 'important');
+        const box = composerBox(rect);
+        if (box) {
+            bar.style.setProperty('left', box.left + 'px', 'important');
+            bar.style.setProperty('width', box.width + 'px', 'important');
+            bar.style.setProperty('max-width', 'none', 'important');
+            bar.style.setProperty('margin-left', '0', 'important');
+            bar.style.setProperty('margin-right', '0', 'important');
         }
         syncFixedPin(bar);
         const scroller = follow.scroller;
@@ -704,6 +762,11 @@
         // Keep the pin glued to the visual viewport (mobile keyboards).
         const offset = Math.max(0, window.innerHeight - viewportBottom());
         bar.style.setProperty('bottom', offset + 'px', 'important');
+        if (CFG.wideComposer) {
+            bar.style.setProperty('left', '0px', 'important');
+            bar.style.setProperty('width', viewportWidth() + 'px', 'important');
+            return;
+        }
         const parent = bar.parentElement;
         if (parent) {
             const pr = parent.getBoundingClientRect();
@@ -712,6 +775,44 @@
                 bar.style.setProperty('width', Math.round(pr.width) + 'px', 'important');
             }
         }
+    }
+
+    /**
+     * Remove whatever width cap keeps the composer narrower than the
+     * viewport (typically a `max-w-3xl mx-auto` column). We walk up from the
+     * bar and refuse to widen any ancestor that also holds the message log —
+     * widening that would restyle the whole conversation, not the composer.
+     *
+     * Returns true when the bar is still narrower than the viewport, which is
+     * the signal to fall back to a full-width fixed pin.
+     */
+    function widenComposer(bar) {
+        if (!CFG.wideComposer || !bar) return false;
+        const vw = viewportWidth();
+
+        let node = bar;
+        for (let depth = 0; node && depth < 5; depth++) {
+            if (node === document.body || node === document.documentElement) break;
+            if (node === composer.el) break;
+            if (follow.log && node.contains(follow.log)) break;
+
+            const rect = node.getBoundingClientRect();
+            const maxWidth = parseFloat(getComputedStyle(node).maxWidth);
+            const capped = (!isNaN(maxWidth) && maxWidth < vw - 8) ||
+                (rect.width > 0 && rect.width < vw - 8);
+
+            if (capped) {
+                node.style.setProperty('max-width', 'none', 'important');
+                node.style.setProperty('width', '100%', 'important');
+                node.style.setProperty('margin-left', '0', 'important');
+                node.style.setProperty('margin-right', '0', 'important');
+                node.dataset.afxWide = '1';
+            }
+            node = node.parentElement;
+        }
+
+        const rect = bar.getBoundingClientRect();
+        return rect.width > 0 && rect.width < vw - 8;
     }
 
     function ensureComposerPinned() {
@@ -730,6 +831,11 @@
         }
         const bar = composer.bar;
         if (!bar) return;
+
+        if (!CFG.pinComposer) {
+            widenComposer(bar);
+            return;
+        }
 
         if (composer.pinned) {
             if (bar.getBoundingClientRect().height === 0) {
@@ -755,9 +861,392 @@
         if (now - composer.lastCheck < 500) return;
         composer.lastCheck = now;
 
+        const stillNarrow = widenComposer(bar);
+
         const rect = bar.getBoundingClientRect();
         if (!rect.height) return;
-        if (rect.bottom > viewportBottom() + 4) applyFixedPin(bar, rect);
+        // Pin when the bar is not on the bottom edge, or when the surrounding
+        // layout refuses to let it span the viewport.
+        if (rect.bottom > viewportBottom() + 4 || stillNarrow) applyFixedPin(bar, rect);
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // 2b. TOP NAV PINNING
+    // ════════════════════════════════════════════════════════════════
+
+    const topbar = { el: null, pinned: false, spacerParent: null, lastCheck: 0 };
+
+    function findTopBar() {
+        let best = null;
+        let bestRect = null;
+
+        for (const el of $$('header, [role="banner"], nav')) {
+            if (isOurs(el) || !isVisible(el)) continue;
+            if (el.closest('[role="log"]')) continue;
+            if (el.closest('[data-afx-composer="1"], [data-afx-wide="1"]')) continue;
+
+            const rect = el.getBoundingClientRect();
+            if (rect.top > 32) continue;                       // must hug the top edge
+            if (rect.height < 20 || rect.height > 200) continue; // bar, not a whole pane
+            if (rect.width < viewportWidth() * 0.5) continue;    // not a side rail
+
+            if (!bestRect || rect.width > bestRect.width ||
+                (rect.width === bestRect.width && rect.height > bestRect.height)) {
+                best = el;
+                bestRect = rect;
+            }
+        }
+        if (!best) return null;
+
+        // Climb to the outermost wrapper that is still just the top bar.
+        let node = best;
+        while (node.parentElement && node.parentElement !== document.body) {
+            const parent = node.parentElement;
+            if (parent.matches('main, [role="main"], [role="log"]')) break;
+            if (follow.log && parent.contains(follow.log)) break;
+            const rect = parent.getBoundingClientRect();
+            if (rect.top > 32 || rect.height < 20 || rect.height > 200) break;
+            if (rect.width < viewportWidth() * 0.5) break;
+            node = parent;
+        }
+        return node;
+    }
+
+    function currentScrollTop() {
+        let top = window.scrollY || document.documentElement.scrollTop || 0;
+        if (follow.scroller && follow.scroller !== document.scrollingElement) {
+            top = Math.max(top, follow.scroller.scrollTop || 0);
+        }
+        return top;
+    }
+
+    function applyTopBarFixed(bar, rect) {
+        topbar.pinned = true;
+        bar.dataset.afxTopPinned = '1';
+        bar.style.setProperty('position', 'fixed', 'important');
+        bar.style.setProperty('top', '0px', 'important');
+        bar.style.setProperty('left', Math.round(rect.left) + 'px', 'important');
+        bar.style.setProperty('width', Math.round(rect.width) + 'px', 'important');
+        bar.style.setProperty('box-sizing', 'border-box', 'important');
+        bar.style.setProperty('z-index', '60', 'important');
+
+        // Reserve the space the bar used to occupy so the content below does
+        // not jump up underneath it.
+        const parent = bar.parentElement;
+        if (parent && !topbar.spacerParent) {
+            topbar.spacerParent = parent;
+            parent.style.setProperty('padding-top', Math.round(rect.height) + 'px', 'important');
+        }
+        syncTopBarPin();
+        log('top nav pinned (fixed fallback)');
+    }
+
+    /** Keep a fixed top bar matched to its slot after viewport resizes. */
+    function syncTopBarPin() {
+        const bar = topbar.el;
+        if (!topbar.pinned || !bar) return;
+        const parent = bar.parentElement;
+        const rect = parent ? parent.getBoundingClientRect() : null;
+        if (rect && rect.width > 0) {
+            bar.style.setProperty('left', Math.round(rect.left) + 'px', 'important');
+            bar.style.setProperty('width', Math.round(rect.width) + 'px', 'important');
+        } else {
+            bar.style.setProperty('left', '0px', 'important');
+            bar.style.setProperty('width', viewportWidth() + 'px', 'important');
+        }
+    }
+
+    function releaseTopBar(bar) {
+        if (bar) {
+            delete bar.dataset.afxTopPinned;
+            delete bar.dataset.afxTopbar;
+        }
+        if (topbar.spacerParent) {
+            topbar.spacerParent.style.removeProperty('padding-top');
+            topbar.spacerParent = null;
+        }
+        topbar.pinned = false;
+    }
+
+    function ensureTopBarPinned() {
+        if (!CFG.pinTopNav) return;
+
+        const bar = findTopBar();
+        if (!bar) {
+            if (topbar.el) releaseTopBar(topbar.el);
+            topbar.el = null;
+            return;
+        }
+        if (bar !== topbar.el) {
+            if (topbar.el && topbar.el !== bar) releaseTopBar(topbar.el);
+            topbar.el = bar;
+            topbar.pinned = false;
+        }
+
+        if (topbar.pinned) {
+            const rect = bar.getBoundingClientRect();
+            if (!bar.isConnected || rect.height === 0) {
+                // React re-rendered it away from our pin.
+                if (topbar.spacerParent) {
+                    topbar.spacerParent.style.removeProperty('padding-top');
+                    topbar.spacerParent = null;
+                }
+                topbar.pinned = false;
+                delete bar.dataset.afxTopPinned;
+            }
+            return;
+        }
+
+        // Arena may already keep it at the top itself; only step in if not.
+        const tagged = bar.dataset.afxTopbar === '1';
+        if (!tagged) {
+            const position = getComputedStyle(bar).position || 'static';
+            if (position === 'fixed' || position === 'sticky') {
+                topbar.el = null;
+                return;
+            }
+            bar.dataset.afxTopbar = '1';
+        }
+
+        const now = performance.now();
+        if (now - topbar.lastCheck < 500) return;
+        topbar.lastCheck = now;
+
+        const rect = bar.getBoundingClientRect();
+        if (!rect.height) return;
+        // Sticky only works while its ancestors cooperate. Once the page is
+        // scrolled, a working sticky bar sits at top ~= 0; anything else means
+        // it has scrolled away (negative top) or is being pushed around.
+        const offTopEdge = rect.top > 4 || rect.top < -1;
+        if (currentScrollTop() > 4 && offTopEdge) applyTopBarFixed(bar, rect);
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // 2c. DIFF VIEWER WIDTH
+    // ════════════════════════════════════════════════════════════════
+
+    const diffview = { el: null, floating: false, lastCheck: 0 };
+
+    // Panels Arena may render the diff in: an overlay drawer, a split pane or
+    // a dialog. Anything that is just the nav icon is far too small to pass
+    // the size gate below.
+    const DIFF_PANEL_HINTS = [
+        '[data-testid*="diff" i]',
+        '[data-testid*="patch" i]',
+        '[data-testid*="changes" i]',
+        '[data-diff]',
+        '[class*="diff-view" i]',
+        '[class*="diffview" i]',
+        '[class*="diff-panel" i]',
+        '[class*="diff-container" i]',
+        '[class*="diffEditor" i]',
+        '[class*="monaco-diff" i]',
+        '[class*="react-diff" i]',
+        '[class*="code-diff" i]',
+        '[class*="changes-panel" i]',
+        '[aria-label*="diff" i]',
+        '[aria-label*="files changed" i]',
+        // Generic surfaces: only accepted when they actually hold diff content.
+        '[role="dialog"]',
+        '[role="complementary"]',
+        'aside',
+    ];
+
+    const DIFF_CONTENT_HINTS =
+        '[class*="diff-line" i],[class*="diff-row" i],[class*="diff-hunk" i],' +
+        '[class*="monaco" i],[data-line-type],[data-diff-key],[class*="patch" i],' +
+        'pre[class*="diff" i],[data-line-number]';
+
+    function metaOf(el) {
+        return [
+            classish(el),
+            el.id || '',
+            el.getAttribute('aria-label') || '',
+            el.getAttribute('data-testid') || '',
+        ].join(' ');
+    }
+
+    /** A real diff surface is only trusted if it actually holds diff content. */
+    function holdsDiffContent(el) {
+        return !!el.querySelector(DIFF_CONTENT_HINTS);
+    }
+
+    function isFloating(el) {
+        const position = getComputedStyle(el).position || 'static';
+        return position === 'fixed' || position === 'absolute';
+    }
+
+    /**
+     * Find the largest visible diff surface that is not the conversation and
+     * not the nav icon: panel-sized, diff-flavoured, and either floating or
+     * holding diff content.
+     */
+    function findDiffPanel() {
+        const vw = viewportWidth();
+        const seen = new Set();
+        let best = null;
+        let bestArea = 0;
+
+        for (const selector of DIFF_PANEL_HINTS) {
+            for (const el of $$(selector)) {
+                if (seen.has(el)) continue;
+                seen.add(el);
+
+                if (isOurs(el)) continue;
+                if (el.closest('[role="log"]')) continue;        // message content
+                if (el.closest('[data-afx-composer="1"]')) continue;
+                if (el.id === AFX.exportBtnId) continue;
+                if (!isVisible(el)) continue;
+
+                const rect = el.getBoundingClientRect();
+                if (rect.width < 240 || rect.height < 200) continue; // nav icon, chips, badges
+                if (rect.width > vw + 2 && !isFloating(el)) continue; // the app shell itself
+                // Ignore closed drawers parked off-screen with a transform.
+                if (rect.right < 80 || rect.left > vw - 80) continue;
+                if (rect.bottom < 80 || rect.top > viewportBottom() - 80) continue;
+
+                const diffish = /diff|patch|changes/i.test(metaOf(el));
+                if (!diffish && !holdsDiffContent(el)) continue;
+                if (!isFloating(el) && !holdsDiffContent(el)) continue;
+
+                const area = rect.width * rect.height;
+                if (area > bestArea) {
+                    best = el;
+                    bestArea = area;
+                }
+            }
+        }
+        return best;
+    }
+
+    /** Clear width caps on descendants so the diff itself can use the room. */
+    function widenDiffContents(panel) {
+        const vw = viewportWidth();
+        let depth = 0;
+        let level = [panel];
+
+        while (level.length && depth < 3) {
+            const next = [];
+            for (const node of level) {
+                for (const child of node.children) {
+                    if (!isElement(child) || isOurs(child)) continue;
+                    next.push(child);
+                    const style = getComputedStyle(child);
+                    const maxWidth = parseFloat(style.maxWidth);
+                    const rect = child.getBoundingClientRect();
+                    const capped = (!isNaN(maxWidth) && maxWidth < vw - 8) ||
+                        (rect.width > 200 && rect.width < vw - 8);
+                    if (!capped) continue;
+                    if (rect.height < 40) continue;                 // toolbars, gutters
+                    if (child.dataset.afxDiffWide === '1') continue;
+                    child.dataset.afxDiffWide = '1';
+                    child.style.setProperty('max-width', 'none', 'important');
+                    child.style.setProperty('width', '100%', 'important');
+                    child.style.setProperty('margin-left', '0', 'important');
+                    child.style.setProperty('margin-right', '0', 'important');
+                }
+            }
+            level = next;
+            depth++;
+        }
+    }
+
+    function applyDiffWidth(panel) {
+        const vw = viewportWidth();
+        const rect = panel.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+
+        panel.dataset.afxDiff = '1';
+        const floating = isFloating(panel);
+
+        if (floating) {
+            diffview.floating = true;
+            panel.dataset.afxDiffFloating = '1';
+
+            // A centred modal uses a transform for its offset; clearing it
+            // without freezing the box would teleport the panel.
+            const transform = getComputedStyle(panel).transform;
+            if (transform && transform !== 'none') {
+                panel.style.setProperty('transform', 'none', 'important');
+                panel.style.setProperty('top', Math.round(Math.max(0, rect.top)) + 'px', 'important');
+            }
+
+            panel.style.setProperty('left', '0px', 'important');
+            panel.style.setProperty('right', 'auto', 'important');
+            panel.style.setProperty('width', vw + 'px', 'important');
+            panel.style.setProperty('max-width', 'none', 'important');
+            panel.style.setProperty('margin-left', '0', 'important');
+            panel.style.setProperty('margin-right', '0', 'important');
+        } else {
+            diffview.floating = false;
+            delete panel.dataset.afxDiffFloating;
+            panel.style.removeProperty('left');
+            panel.style.removeProperty('right');
+            panel.style.setProperty('max-width', 'none', 'important');
+            panel.style.setProperty('width', '100%', 'important');
+            panel.style.setProperty('min-width', '0', 'important');
+            panel.style.setProperty('margin-left', '0', 'important');
+            panel.style.setProperty('margin-right', '0', 'important');
+            panel.style.setProperty('flex', '1 1 auto', 'important');
+
+            // Let the surrounding column give it more room, but never touch an
+            // ancestor that also holds the conversation.
+            let node = panel.parentElement;
+            for (let depth = 0; node && depth < 4; depth++, node = node.parentElement) {
+                if (node === document.body || node === document.documentElement) break;
+                if (node.matches('main, [role="main"]')) break;
+                if (follow.log && node.contains(follow.log)) break;
+                if (node.dataset.afxWideDiffParent === '1') continue;
+                const parentRect = node.getBoundingClientRect();
+                const maxWidth = parseFloat(getComputedStyle(node).maxWidth);
+                const capped = (!isNaN(maxWidth) && maxWidth < vw - 8) ||
+                    (parentRect.width > 0 && parentRect.width < vw - 8);
+                if (!capped) continue;
+                node.dataset.afxWideDiffParent = '1';
+                node.style.setProperty('max-width', 'none', 'important');
+                node.style.setProperty('width', '100%', 'important');
+                node.style.setProperty('margin-left', '0', 'important');
+                node.style.setProperty('margin-right', '0', 'important');
+            }
+        }
+
+        widenDiffContents(panel);
+        log('diff viewer widened', floating ? '(floating)' : '(in flow)');
+    }
+
+    function ensureDiffViewerWide() {
+        if (!CFG.wideDiffViewer) return;
+
+        const panel = findDiffPanel();
+        if (!panel) {
+            if (diffview.el) {
+                diffview.el = null;
+                diffview.floating = false;
+            }
+            return;
+        }
+        if (panel !== diffview.el) {
+            diffview.el = panel;
+            diffview.lastCheck = 0;
+        }
+
+        // Cheap guard: only do work while something is actually off.
+        const rect = panel.getBoundingClientRect();
+        const wideEnough = rect.width >= viewportWidth() - 8;
+        if (wideEnough && panel.dataset.afxDiff === '1') return;
+
+        const now = performance.now();
+        if (now - diffview.lastCheck < 400) return;
+        diffview.lastCheck = now;
+
+        applyDiffWidth(panel);
+    }
+
+    /** Re-apply a fixed pixel width after the viewport changes. */
+    function syncDiffViewerWidth() {
+        const panel = diffview.el;
+        if (!CFG.wideDiffViewer || !panel || !panel.isConnected) return;
+        if (diffview.floating) applyDiffWidth(panel);
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -1237,6 +1726,7 @@ clone.outerHTML + '\n' +
         for (const selector of DIFF_SELECTORS) {
             for (const el of $$(selector)) {
                 if (isOurs(el) || el.closest('[role="log"]')) continue;
+                if (el.closest('[data-afx-diff="1"]') || el.hasAttribute('data-afx-diff')) continue;
                 if (!isVisible(el)) continue;
                 const r = el.getBoundingClientRect();
                 if (r.top > window.innerHeight * 0.22) continue; // must live in the top nav
@@ -1326,7 +1816,9 @@ clone.outerHTML + '\n' +
 
     function scan() {
         ensureFollowBinding();
-        if (CFG.pinComposer) ensureComposerPinned();
+        if (CFG.pinComposer || CFG.wideComposer) ensureComposerPinned();
+        ensureTopBarPinned();
+        ensureDiffViewerWide();
         if (CFG.showExportButton) ensureExportButton();
         scheduleFollow();
     }
@@ -1365,6 +1857,10 @@ clone.outerHTML + '\n' +
         stop: () => stopFollowing('api'),
         export: exportConversation,
         config: CFG,
-        _internals: { findComposer, findComposerBar, ensureComposerPinned, composer },
+        _internals: {
+            findComposer, findComposerBar, ensureComposerPinned, composer,
+            findTopBar, ensureTopBarPinned, widenComposer, topbar,
+            findDiffPanel, ensureDiffViewerWide, applyDiffWidth, diffview,
+        },
     };
 })();
