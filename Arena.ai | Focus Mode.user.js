@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Arena.ai | Focus Mode
 // @namespace    https://arena.ai/
-// @version      1.2.0
+// @version      1.3.0
 // @author       Piknockyou (vibe-coded)
 // @license      AGPL-3.0
 // @description  Keeps an Arena conversation flowing: sticky auto-scroll that pauses the moment you interact and resumes when you click Arena's scroll-down arrow, locked zoom, a navbar pinned to the top, a composer pinned to the bottom and widened to fit the viewport, the diff viewer widened to fit it too, a flattened/optimized DOM, and one-click HTML export of the whole conversation (theme + layout preserved, folding still works).
@@ -14,7 +14,7 @@
 // ==/UserScript==
 
 /* ══════════════════════════════════════════════════════════════════
- * Arena.ai | Focus Mode — v1.2.0
+ * Arena.ai | Focus Mode — v1.3.0
  * ══════════════════════════════════════════════════════════════════
  *
  * A deliberately small script with four jobs:
@@ -1027,10 +1027,23 @@
 
     const diffview = { el: null, floating: false, lastCheck: 0 };
 
+    // The diff viewer lives inside Arena's "workspace" panel, opened from the
+    // top nav: <button aria-label="Open workspace"> (folder icon, h-8 w-8).
+    // That button is the anchor: aria-controls / aria-expanded tell us whether
+    // the panel is open and, when present, which element it is.
+    const WORKSPACE_TOGGLE_LABEL = /^(open|show|toggle|view)\s+(the\s+)?(workspace|files|diff|changes)\b|^(workspace|file\s*tree|files changed)$/i;
+
     // Panels Arena may render the diff in: an overlay drawer, a split pane or
     // a dialog. Anything that is just the nav icon is far too small to pass
     // the size gate below.
     const DIFF_PANEL_HINTS = [
+        '[data-testid*="workspace" i]',
+        '[class*="workspace-panel" i]',
+        '[class*="workspace-pane" i]',
+        '[aria-label*="workspace" i]',
+        '[data-testid*="file-tree" i]',
+        '[class*="file-tree" i]',
+        '[class*="filetree" i]',
         '[data-testid*="diff" i]',
         '[data-testid*="patch" i]',
         '[data-testid*="changes" i]',
@@ -1076,52 +1089,192 @@
         return position === 'fixed' || position === 'absolute';
     }
 
+    /** The "Open workspace" nav button (any size: it is only an anchor). */
+    function findWorkspaceToggle() {
+        for (const el of $$('button, [role="button"], a, [role="tab"]')) {
+            if (isOurs(el) || el.closest('[role="log"]')) continue;
+            if (el.querySelector('[role="log"]')) continue;
+            if (!isVisible(el)) continue;
+            const label = [
+                el.getAttribute('aria-label'),
+                el.getAttribute('title'),
+                text(el).slice(0, 40),
+            ].filter(Boolean).join(' ').trim();
+            if (!label) continue;
+            if (!WORKSPACE_TOGGLE_LABEL.test(label)) continue;
+            // A toggle is a control, not the panel itself.
+            const rect = el.getBoundingClientRect();
+            if (rect.width > 320 || rect.height > 120) continue;
+            return el;
+        }
+        return null;
+    }
+
+    /** Whether the toggle (or its tab wrapper) says the panel is open. */
+    function toggleIsOpen(toggle) {
+        if (!toggle) return false;
+        for (const level of [toggle, toggle.parentElement, toggle.closest('[data-state]')]) {
+            if (!level) continue;
+            const state = level.getAttribute('data-state');
+            if (state === 'open' || state === 'on') return true;
+            if (state === 'closed' || state === 'off') return false;
+            const expanded = level.getAttribute('aria-expanded');
+            if (expanded === 'true') return true;
+            if (expanded === 'false') return false;
+            const pressed = level.getAttribute('aria-pressed');
+            if (pressed === 'true') return true;
+            if (pressed === 'false') return false;
+        }
+        return true; // no explicit state: fall back to visibility checks
+    }
+
+    function isPanelCandidate(el, vw) {
+        if (!isElement(el) || isOurs(el)) return false;
+        if (el.closest('[role="log"]')) return false;
+        if (el.querySelector('[role="log"]')) return false;
+        if (el.closest('[data-afx-composer="1"]')) return false;
+        if (el.id === AFX.exportBtnId) return false;
+        if (!isVisible(el)) return false;
+        const rect = el.getBoundingClientRect();
+        if (rect.width < 240 || rect.height < 200) return false;
+        if (rect.width > vw + 2 && !isFloating(el)) return false;
+        if (rect.right < 80 || rect.left > vw - 80) return false;
+        if (rect.bottom < 80 || rect.top > viewportBottom() - 80) return false;
+        return true;
+    }
+
+    /** Resolve the panel through the toggle's aria-controls, if it has one. */
+    function panelFromToggle(toggle) {
+        if (!toggle) return null;
+        const holder = toggle.hasAttribute('aria-controls') ? toggle : toggle.closest('[aria-controls]');
+        if (!holder) return null;
+        const id = holder.getAttribute('aria-controls');
+        if (!id) return null;
+        let target = null;
+        try {
+            target = document.getElementById(id);
+        } catch (_e) {}
+        if (!target || target.contains(toggle)) return null;
+        return isPanelCandidate(target, viewportWidth()) ? target : null;
+    }
+
     /**
-     * Find the largest visible diff surface that is not the conversation and
-     * not the nav icon: panel-sized, diff-flavoured, and either floating or
-     * holding diff content.
+     * Find the panel that holds the diff viewer.
+     *
+     * 1. The "Open workspace" nav button is authoritative: when it reports the
+     *    panel as open, use its aria-controls target or the largest
+     *    workspace-flavoured panel on screen.
+     * 2. Otherwise fall back to diff-flavoured surfaces and content sniffing.
      */
     function findDiffPanel() {
         const vw = viewportWidth();
+        const toggle = findWorkspaceToggle();
+        const open = toggleIsOpen(toggle);
+
+        if (open) {
+            const controlled = panelFromToggle(toggle);
+            if (controlled) return controlled;
+        }
+
         const seen = new Set();
         let best = null;
         let bestArea = 0;
 
+        /** Largest accepted surface wins, which favours the outer panel. */
+        const consider = (el) => {
+            if (seen.has(el)) return;
+            seen.add(el);
+            if (!isPanelCandidate(el, vw)) return;
+
+            const meta = metaOf(el);
+            const workspaceish = /workspace|file-?tree|file-?browser/i.test(meta);
+            const diffish = /diff|patch|changes/i.test(meta);
+            const content = holdsDiffContent(el);
+
+            // Without the toggle's blessing we need some evidence.
+            if (!open && !workspaceish && !diffish && !content) return;
+            if (!isFloating(el) && !content && !workspaceish) return;
+
+            const area = el.getBoundingClientRect().width * el.getBoundingClientRect().height;
+            if (area > bestArea) {
+                best = el;
+                bestArea = area;
+            }
+        };
+
         for (const selector of DIFF_PANEL_HINTS) {
-            for (const el of $$(selector)) {
-                if (seen.has(el)) continue;
-                seen.add(el);
+            for (const el of $$(selector)) consider(el);
+        }
 
-                if (isOurs(el)) continue;
-                if (el.closest('[role="log"]')) continue;        // message content
-                if (el.closest('[data-afx-composer="1"]')) continue;
-                if (el.id === AFX.exportBtnId) continue;
-                if (!isVisible(el)) continue;
-
-                const rect = el.getBoundingClientRect();
-                if (rect.width < 240 || rect.height < 200) continue; // nav icon, chips, badges
-                if (rect.width > vw + 2 && !isFloating(el)) continue; // the app shell itself
-                // Ignore closed drawers parked off-screen with a transform.
-                if (rect.right < 80 || rect.left > vw - 80) continue;
-                if (rect.bottom < 80 || rect.top > viewportBottom() - 80) continue;
-
-                const diffish = /diff|patch|changes/i.test(metaOf(el));
-                if (!diffish && !holdsDiffContent(el)) continue;
-                if (!isFloating(el) && !holdsDiffContent(el)) continue;
-
-                const area = rect.width * rect.height;
-                if (area > bestArea) {
-                    best = el;
-                    bestArea = area;
-                }
+        if (!best && open) {
+            // The toggle says it is open but nothing is flavoured: accept the
+            // largest panel-sized surface that is not the conversation.
+            for (const el of $$('[role="dialog"], aside, [class*="panel" i], [class*="drawer" i], [class*="sidebar" i]')) {
+                consider(el);
             }
         }
         return best;
     }
 
-    /** Clear width caps on descendants so the diff itself can use the room. */
+    /** Verbose diagnostics for the panel detection (console only). */
+    function debugDiffPanel() {
+        const vw = viewportWidth();
+        const toggle = findWorkspaceToggle();
+        const report = {
+            viewport: { width: vw, height: viewportBottom() },
+            toggle: toggle ? {
+                label: toggle.getAttribute('aria-label') || text(toggle).slice(0, 40),
+                open: toggleIsOpen(toggle),
+                ariaControls: toggle.getAttribute('aria-controls'),
+                rect: (() => { const r = toggle.getBoundingClientRect(); return [r.top, r.left, r.width, r.height]; })(),
+            } : null,
+            chosen: null,
+            candidates: [],
+        };
+
+        const seen = new Set();
+        for (const selector of DIFF_PANEL_HINTS) {
+            for (const el of $$(selector)) {
+                if (seen.has(el)) continue;
+                seen.add(el);
+                const rect = el.getBoundingClientRect();
+                report.candidates.push({
+                    selector,
+                    tag: el.tagName.toLowerCase(),
+                    id: el.id || null,
+                    cls: (classish(el) || '').slice(0, 120),
+                    aria: el.getAttribute('aria-label'),
+                    testid: el.getAttribute('data-testid'),
+                    rect: [rect.top, rect.left, rect.width, rect.height],
+                    visible: isVisible(el),
+                    floating: isFloating(el),
+                    content: holdsDiffContent(el),
+                    accepted: isPanelCandidate(el, vw),
+                });
+            }
+        }
+
+        const chosen = findDiffPanel();
+        if (chosen) {
+            const rect = chosen.getBoundingClientRect();
+            report.chosen = {
+                tag: chosen.tagName.toLowerCase(),
+                cls: (classish(chosen) || '').slice(0, 120),
+                rect: [rect.top, rect.left, rect.width, rect.height],
+            };
+        }
+        console.log('[FocusMode] diff/workspace panel report', report);
+        return report;
+    }
+
+    /**
+     * Clear width caps on descendants so the diff body — not just its shell —
+     * uses the room. Narrow side rails (file trees, gutters) are left at their
+     * own width: only capped columns and the panel's main region are widened.
+     */
     function widenDiffContents(panel) {
         const vw = viewportWidth();
+        const panelWidth = panel.getBoundingClientRect().width || vw;
         let depth = 0;
         let level = [panel];
 
@@ -1131,13 +1284,20 @@
                 for (const child of node.children) {
                     if (!isElement(child) || isOurs(child)) continue;
                     next.push(child);
+
+                    const rect = child.getBoundingClientRect();
+                    if (rect.height < 40) continue;                  // toolbars, gutters
+                    if (rect.width <= 0) continue;
+                    if (rect.width >= vw - 8) continue;              // already wide
+
+                    const meta = metaOf(child);
+                    if (/tree|sidebar|explorer|file-?list|outline/i.test(meta)) continue;
+
                     const style = getComputedStyle(child);
                     const maxWidth = parseFloat(style.maxWidth);
-                    const rect = child.getBoundingClientRect();
-                    const capped = (!isNaN(maxWidth) && maxWidth < vw - 8) ||
-                        (rect.width > 200 && rect.width < vw - 8);
-                    if (!capped) continue;
-                    if (rect.height < 40) continue;                 // toolbars, gutters
+                    const capped = !isNaN(maxWidth) && maxWidth < vw - 8;
+                    const mainRegion = rect.width >= panelWidth * 0.6;
+                    if (!capped && !mainRegion) continue;             // leave side rails alone
                     if (child.dataset.afxDiffWide === '1') continue;
                     child.dataset.afxDiffWide = '1';
                     child.style.setProperty('max-width', 'none', 'important');
@@ -1856,11 +2016,14 @@ clone.outerHTML + '\n' +
         resume: () => resumeFollowing('api'),
         stop: () => stopFollowing('api'),
         export: exportConversation,
+        /** Print what the diff/workspace panel detection sees. */
+        debugDiff: debugDiffPanel,
         config: CFG,
         _internals: {
             findComposer, findComposerBar, ensureComposerPinned, composer,
             findTopBar, ensureTopBarPinned, widenComposer, topbar,
             findDiffPanel, ensureDiffViewerWide, applyDiffWidth, diffview,
+            findWorkspaceToggle, debugDiffPanel,
         },
     };
 })();
