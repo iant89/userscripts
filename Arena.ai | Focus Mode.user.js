@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Arena.ai | Focus Mode
 // @namespace    https://arena.ai/
-// @version      1.4.0
+// @version      1.5.0
 // @author       Piknockyou (vibe-coded)
 // @license      AGPL-3.0
-// @description  Keeps an Arena conversation flowing: sticky auto-scroll that pauses the moment you interact and resumes when you click Arena's scroll-down arrow, locked zoom, a navbar pinned to the top, a composer pinned to the bottom and widened to fit the viewport, the diff viewer widened to fit it too, a flattened/optimized DOM, and one-click HTML export of the whole conversation (theme + layout preserved, folding still works).
+// @description  Keeps an Arena conversation flowing: sticky auto-scroll that pauses the moment you interact and resumes when you click Arena's scroll-down arrow, locked zoom, a navbar pinned to the top, a composer pinned to the bottom and widened to fit the viewport, the diff viewer widened to fit it too, an auto-confirmed task review prompt, a settings side panel, a flattened/optimized DOM, and one-click HTML export of the whole conversation (theme + layout preserved, folding still works).
 // @match        *://*.arena.ai/*
 // @match        *://*.canaryarena.ai/*
 // @match        *://chat.lmsys.org/*
@@ -14,7 +14,7 @@
 // ==/UserScript==
 
 /* ══════════════════════════════════════════════════════════════════
- * Arena.ai | Focus Mode — v1.4.0
+ * Arena.ai | Focus Mode — v1.5.0
  * ══════════════════════════════════════════════════════════════════
  *
  * A deliberately small script with four jobs:
@@ -52,6 +52,10 @@
  *                its close button ("Close review panel") or its header
  *                text, and its "Yes" action is clicked for you, once per
  *                panel, so reviews never stall a session.
+ *
+ *   6. SETTINGS  A side panel (gear tab on the right edge, or Alt+Shift+S)
+ *                exposes every flag above, applies changes live, undoes
+ *                any styling it turns off, and persists to localStorage.
  *
  * Plus DOM optimisation: Shiki code blocks are flattened from tens of
  * thousands of spans to plain text, empty inline wrappers are unwrapped,
@@ -109,12 +113,46 @@
         verbose: false,
     };
 
+    // Snapshot of the shipped defaults, so the settings panel can reset.
+    const DEFAULTS = { ...CFG };
+    const SETTINGS_KEY = 'arenaFocus.settings.v1';
+
+    function loadSettings() {
+        try {
+            const raw = localStorage.getItem(SETTINGS_KEY);
+            if (!raw) return;
+            const stored = JSON.parse(raw);
+            for (const key of Object.keys(DEFAULTS)) {
+                if (!(key in stored)) continue;
+                if (typeof stored[key] !== typeof DEFAULTS[key]) continue;
+                CFG[key] = stored[key];
+            }
+        } catch (_e) {
+            /* private mode / corrupt value: keep defaults */
+        }
+    }
+
+    function saveSettings() {
+        try {
+            const out = {};
+            for (const key of Object.keys(DEFAULTS)) out[key] = CFG[key];
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(out));
+        } catch (_e) {
+            /* storage unavailable: settings simply stay session-only */
+        }
+    }
+
+    loadSettings();
+
     const MARKER = '/* Arena.ai | Focus Mode */';
 
     const AFX = {
         styleId: 'afx-style',
         exportBtnId: 'afx-nav-export',
         ui: 'data-afx-ui',
+        settingsId: 'afx-settings',
+        settingsHandleId: 'afx-settings-handle',
+        scrimId: 'afx-settings-scrim',
     };
 
     const log = (...args) => { if (CFG.verbose) console.log('[FocusMode]', ...args); };
@@ -289,6 +327,218 @@
                 background: rgba(127,127,127,.14);
             }
             @media print { #${AFX.exportBtnId} { display: none !important; } }
+
+            /* ══ Settings side panel ══ */
+            #${AFX.settingsHandleId} {
+                position: fixed;
+                top: 50%;
+                right: 0;
+                transform: translateY(-50%);
+                z-index: 2147483001;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 26px;
+                height: 54px;
+                padding: 0;
+                border: 1px solid rgba(127,127,127,.32);
+                border-right: 0;
+                border-radius: 10px 0 0 10px;
+                background: rgba(127,127,127,.16);
+                color: inherit;
+                cursor: pointer;
+                opacity: .65;
+                transition: opacity .15s ease, background-color .15s ease !important;
+            }
+            #${AFX.settingsHandleId}:hover { opacity: 1; background: rgba(127,127,127,.3); }
+            #${AFX.settingsHandleId}:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; opacity: 1; }
+            #${AFX.settingsHandleId} svg { width: 15px; height: 15px; display: block; }
+            #${AFX.settingsHandleId}[hidden] { display: none !important; }
+
+            #${AFX.settingsId} {
+                --afx-bg: #18181b;
+                --afx-fg: #e4e4e7;
+                --afx-muted: #a1a1aa;
+                --afx-line: #2c2c30;
+                --afx-soft: rgba(255,255,255,.05);
+                --afx-accent: #60a5fa;
+                position: fixed;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                width: min(360px, 92vw);
+                z-index: 2147483002;
+                display: flex;
+                flex-direction: column;
+                box-sizing: border-box;
+                background: var(--afx-bg);
+                color: var(--afx-fg);
+                border-left: 1px solid var(--afx-line);
+                box-shadow: -12px 0 32px rgba(0,0,0,.28);
+                font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+                transform: translateX(102%);
+                transition: transform .24s cubic-bezier(.22,.61,.36,1) !important;
+                will-change: transform;
+            }
+            #${AFX.settingsId}[data-afx-theme="light"] {
+                --afx-bg: #ffffff;
+                --afx-fg: #18181b;
+                --afx-muted: #71717a;
+                --afx-line: #e4e4e7;
+                --afx-soft: rgba(0,0,0,.04);
+                --afx-accent: #2563eb;
+            }
+            #${AFX.settingsId}[data-afx-open="1"] { transform: translateX(0); }
+            #${AFX.settingsId}[hidden] { display: none !important; }
+
+            #${AFX.scrimId} {
+                position: fixed;
+                inset: 0;
+                z-index: 2147483000;
+                background: rgba(0,0,0,.18);
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity .2s ease !important;
+            }
+            #${AFX.scrimId}[data-afx-open="1"] { opacity: 1; pointer-events: auto; }
+
+            #${AFX.settingsId} .afx-set-head {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 14px 14px 10px;
+                border-bottom: 1px solid var(--afx-line);
+                flex: 0 0 auto;
+            }
+            #${AFX.settingsId} .afx-set-head h2 {
+                margin: 0;
+                font-size: 14px;
+                font-weight: 600;
+                letter-spacing: .01em;
+                flex: 1 1 auto;
+            }
+            #${AFX.settingsId} .afx-set-head .afx-set-ver {
+                font-size: 11px;
+                color: var(--afx-muted);
+                font-variant-numeric: tabular-nums;
+            }
+            #${AFX.settingsId} .afx-icon-btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 26px;
+                height: 26px;
+                padding: 0;
+                border: 0;
+                border-radius: 6px;
+                background: transparent;
+                color: inherit;
+                cursor: pointer;
+                opacity: .75;
+            }
+            #${AFX.settingsId} .afx-icon-btn:hover { opacity: 1; background: var(--afx-soft); }
+            #${AFX.settingsId} .afx-icon-btn svg { width: 15px; height: 15px; }
+            #${AFX.settingsId} .afx-set-body {
+                flex: 1 1 auto;
+                overflow-y: auto;
+                overscroll-behavior: contain;
+                padding: 6px 14px 16px;
+            }
+            #${AFX.settingsId} .afx-set-section { margin-top: 14px; }
+            #${AFX.settingsId} .afx-set-section > h3 {
+                margin: 0 0 4px;
+                font-size: 11px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: .07em;
+                color: var(--afx-muted);
+            }
+            #${AFX.settingsId} .afx-set-row {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 7px 0;
+                border-bottom: 1px solid var(--afx-line);
+            }
+            #${AFX.settingsId} .afx-set-row:last-child { border-bottom: 0; }
+            #${AFX.settingsId} .afx-set-text { flex: 1 1 auto; min-width: 0; }
+            #${AFX.settingsId} .afx-set-label { display: block; }
+            #${AFX.settingsId} .afx-set-desc {
+                display: block;
+                font-size: 11px;
+                line-height: 1.35;
+                color: var(--afx-muted);
+            }
+            #${AFX.settingsId} input[type="checkbox"] {
+                appearance: none;
+                -webkit-appearance: none;
+                flex: 0 0 auto;
+                width: 34px;
+                height: 20px;
+                margin: 0;
+                border-radius: 999px;
+                background: var(--afx-line);
+                position: relative;
+                cursor: pointer;
+                transition: background-color .16s ease !important;
+            }
+            #${AFX.settingsId} input[type="checkbox"]::after {
+                content: "";
+                position: absolute;
+                top: 2px;
+                left: 2px;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: #fff;
+                box-shadow: 0 1px 2px rgba(0,0,0,.35);
+                transition: transform .16s ease !important;
+            }
+            #${AFX.settingsId} input[type="checkbox"]:checked { background: var(--afx-accent); }
+            #${AFX.settingsId} input[type="checkbox"]:checked::after { transform: translateX(14px); }
+            #${AFX.settingsId} input[type="checkbox"]:focus-visible { outline: 2px solid var(--afx-accent); outline-offset: 2px; }
+            #${AFX.settingsId} .afx-range { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+            #${AFX.settingsId} input[type="range"] {
+                width: 110px;
+                margin: 0;
+                accent-color: var(--afx-accent);
+                cursor: pointer;
+            }
+            #${AFX.settingsId} .afx-range output {
+                min-width: 46px;
+                text-align: right;
+                font-size: 11px;
+                font-variant-numeric: tabular-nums;
+                color: var(--afx-muted);
+            }
+            #${AFX.settingsId} .afx-set-foot {
+                flex: 0 0 auto;
+                display: flex;
+                gap: 8px;
+                padding: 10px 14px;
+                border-top: 1px solid var(--afx-line);
+            }
+            #${AFX.settingsId} .afx-btn {
+                flex: 1 1 auto;
+                height: 30px;
+                padding: 0 10px;
+                border: 1px solid var(--afx-line);
+                border-radius: 7px;
+                background: var(--afx-soft);
+                color: inherit;
+                font: inherit;
+                cursor: pointer;
+            }
+            #${AFX.settingsId} .afx-btn:hover { border-color: var(--afx-accent); }
+            #${AFX.settingsId} .afx-set-note {
+                padding: 0 14px 12px;
+                font-size: 11px;
+                line-height: 1.45;
+                color: var(--afx-muted);
+            }
+            @media print {
+                #${AFX.settingsId}, #${AFX.settingsHandleId}, #${AFX.scrimId} { display: none !important; }
+            }
         `;
 
         return css;
@@ -1642,7 +1892,7 @@
     // ════════════════════════════════════════════════════════════════
 
     const activity = new WeakMap();      // message element -> last mutation timestamp
-    const optimized = new WeakSet();     // message elements already flattened
+    let optimized = new WeakSet();       // message elements already flattened
     const codeOriginals = new WeakMap(); // flattened <code> -> highlighted markup
 
     function markActivity(records) {
@@ -1700,6 +1950,11 @@
         return unwrapped;
     }
 
+    /** Forget which messages were optimised (after a settings change). */
+    function forgetOptimized() {
+        optimized = new WeakSet();
+    }
+
     function optimizeSweep() {
         if (!CFG.optimizeDOM) return;
         const logEl = follow.log || findLog();
@@ -1712,7 +1967,8 @@
         const now = Date.now();
         for (let i = 0; i < messages.length; i++) {
             const msg = messages[i];
-            const isNewest = i >= messages.length - 2;
+            // Only the message still being streamed is off limits.
+            const isNewest = i === messages.length - 1;
             const last = activity.get(msg) || 0;
             if (isNewest || now - last < CFG.idleBeforeOptimize) continue;
             if (optimized.has(msg)) continue;
@@ -2199,8 +2455,429 @@ clone.outerHTML + '\n' +
     }
 
     // ════════════════════════════════════════════════════════════════
+    // 6. SETTINGS SIDE PANEL
+    // ════════════════════════════════════════════════════════════════
+
+    const SETTINGS_SCHEMA = [
+        {
+            title: 'Scrolling',
+            items: [
+                { key: 'autoScroll', label: 'Auto-scroll', desc: 'Follow the conversation while Arena streams' },
+                { key: 'resumeOnArrow', label: 'Resume from the arrow', desc: 'Clicking Arena\u2019s scroll-down arrow re-arms it' },
+                { key: 'followThreshold', label: 'Follow threshold', kind: 'range', min: 0, max: 400, step: 10, unit: 'px' },
+            ],
+        },
+        {
+            title: 'Layout',
+            items: [
+                { key: 'pinComposer', label: 'Pin composer', desc: 'Keep it on the bottom edge of the viewport' },
+                { key: 'wideComposer', label: 'Wide composer', desc: 'Span the full viewport width' },
+                { key: 'pinTopNav', label: 'Pin top navbar', desc: 'Keep the top bar on the top edge' },
+                { key: 'wideDiffViewer', label: 'Wide diff viewer', desc: 'Stretch the workspace / diff panel' },
+            ],
+        },
+        {
+            title: 'Task review',
+            items: [
+                { key: 'autoConfirmTaskReview', label: 'Answer \u201cYes\u201d', desc: 'Confirm when the review prompt appears' },
+                { key: 'reviewClickDelay', label: 'Click delay', kind: 'range', min: 0, max: 1000, step: 50, unit: 'ms' },
+            ],
+        },
+        {
+            title: 'Performance',
+            items: [
+                { key: 'optimizeDOM', label: 'DOM optimisation', desc: 'Flattening, containment, idle sweeps' },
+                { key: 'killTransitions', label: 'Kill transitions', desc: 'Neutralise animations app-wide' },
+                { key: 'killBlurs', label: 'Kill blurs', desc: 'Drop backdrop-filter effects' },
+                { key: 'flattenCode', label: 'Flatten code blocks', desc: 'Collapse highlighter spans to text' },
+                { key: 'unwrapEmptySpans', label: 'Unwrap empty spans', desc: 'Remove attribute-free wrappers' },
+                { key: 'contentVisibility', label: 'Content-visibility', desc: 'Skip painting off-screen messages' },
+                { key: 'idleBeforeOptimize', label: 'Idle before optimising', kind: 'range', min: 500, max: 10000, step: 250, unit: 'ms' },
+            ],
+        },
+        {
+            title: 'Input & export',
+            items: [
+                { key: 'preventZoom', label: 'Prevent zoom', desc: 'Block ctrl/\u2318 wheel, pinch and zoom keys' },
+                { key: 'showExportButton', label: 'Export button', desc: 'Show it next to the diff control' },
+            ],
+        },
+    ];
+
+    const SETTINGS_CSS_KEYS = new Set([
+        'preventZoom', 'optimizeDOM', 'killTransitions', 'killBlurs', 'contentVisibility',
+    ]);
+
+    const SETTINGS_CHROME_KEYS = new Set([
+        'pinComposer', 'wideComposer', 'pinTopNav', 'wideDiffViewer',
+    ]);
+
+    const ICON_GEAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" ' +
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<circle cx="12" cy="12" r="3.2"></circle>' +
+        '<path d="M19.4 15a1.6 1.6 0 0 0 .32 1.77l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.6 1.6 0 0 0 15 19.4a1.6 1.6 0 0 0-1 1.46V21a2 2 0 1 1-4 0v-.09A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.77.32l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.6 1.6 0 0 0 4.6 15a1.6 1.6 0 0 0-1.46-1H3a2 2 0 1 1 0-4h.09A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.32-1.77l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.6 1.6 0 0 0 9 4.6a1.6 1.6 0 0 0 1-1.46V3a2 2 0 1 1 4 0v.09A1.6 1.6 0 0 0 15 4.6a1.6 1.6 0 0 0 1.77-.32l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.6 1.6 0 0 0 19.4 9v.09a1.6 1.6 0 0 0 1.46 1H21a2 2 0 1 1 0 4h-.09a1.6 1.6 0 0 0-1.46 1z"></path>' +
+        '</svg>';
+
+    const ICON_CLOSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+        'stroke-linecap="round" aria-hidden="true"><path d="m6.5 6.5 11 11M17.5 6.5l-11 11"></path></svg>';
+
+    const settingsUI = { el: null, handle: null, scrim: null, open: false };
+
+    function isDarkTheme() {
+        const root = document.documentElement;
+        if (root.classList.contains('dark') || root.getAttribute('data-theme') === 'dark') return true;
+        if (root.classList.contains('light') || root.getAttribute('data-theme') === 'light') return false;
+        return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    }
+
+    /** Undo every inline style this script applied to Arena's layout. */
+    function releaseChrome() {
+        const touched = $$(
+            '[data-afx-composer], [data-afx-pinned], [data-afx-wide], ' +
+            '[data-afx-topbar], [data-afx-top-pinned], [data-afx-diff], ' +
+            '[data-afx-diff-floating], [data-afx-diff-wide], [data-afx-wide-diff-parent]'
+        );
+
+        const props = [
+            'position', 'top', 'right', 'bottom', 'left', 'width', 'max-width', 'min-width',
+            'margin-left', 'margin-right', 'margin-top', 'margin-bottom', 'padding-top',
+            'padding-bottom', 'z-index', 'box-sizing', 'transform', 'flex',
+        ];
+
+        for (const el of touched) {
+            for (const prop of props) el.style.removeProperty(prop);
+            delete el.dataset.afxComposer;
+            delete el.dataset.afxPinned;
+            delete el.dataset.afxWide;
+            delete el.dataset.afxTopbar;
+            delete el.dataset.afxTopPinned;
+            delete el.dataset.afxDiff;
+            delete el.dataset.afxDiffFloating;
+            delete el.dataset.afxDiffWide;
+            delete el.dataset.afxWideDiffParent;
+        }
+
+        if (topbar.spacerParent) {
+            topbar.spacerParent.style.removeProperty('padding-top');
+            topbar.spacerParent = null;
+        }
+        if (follow.scroller) follow.scroller.style.removeProperty('padding-bottom');
+
+        composer.el = null;
+        composer.bar = null;
+        composer.pinned = false;
+        topbar.el = null;
+        topbar.pinned = false;
+        diffview.el = null;
+        diffview.floating = false;
+        log('chrome released');
+    }
+
+    /** Restore highlighted Shiki markup that flattening replaced. */
+    function restoreFlattenedCode() {
+        let restored = 0;
+        for (const code of $$('pre code[data-afx-flat]')) {
+            const original = codeOriginals.get(code);
+            if (original) {
+                code.innerHTML = original;
+                restored++;
+            }
+            delete code.dataset.afxFlat;
+        }
+        for (const msg of $$('.afx-cv')) msg.classList.remove('afx-cv');
+        forgetOptimized();
+        return restored;
+    }
+
+    function applySetting(key, value) {
+        if (!(key in CFG)) return;
+        CFG[key] = value;
+        saveSettings();
+
+        if (key === 'autoScroll') {
+            if (value) resumeFollowing('settings');
+            else stopFollowing('settings');
+        }
+
+        if (key === 'showExportButton') {
+            if (!value) {
+                document.getElementById(AFX.exportBtnId)?.remove();
+            } else {
+                ensureExportButton();
+            }
+        }
+
+        if (key === 'autoConfirmTaskReview' && value) scheduleReviewCheck();
+        if (key === 'preventZoom' && value && typeof installZoomLock === 'function') {
+            // listeners are installed once at boot; nothing to rebuild
+        }
+
+        if (SETTINGS_CHROME_KEYS.has(key)) {
+            releaseChrome();
+            scan();
+        }
+
+        if (SETTINGS_CSS_KEYS.has(key)) injectCSS();
+
+        if (key === 'optimizeDOM' && !value) restoreFlattenedCode();
+        if (key === 'flattenCode') {
+            if (value) {
+                forgetOptimized();
+                optimizeSweep();
+            } else {
+                restoreFlattenedCode();
+            }
+        }
+        if (key === 'unwrapEmptySpans' || key === 'idleBeforeOptimize' || key === 'contentVisibility') {
+            if (!value) {
+                restoreFlattenedCode();
+            } else {
+                forgetOptimized();
+                optimizeSweep();
+            }
+        }
+        if (key === 'followThreshold' || key === 'reviewClickDelay') {
+            scheduleReviewCheck();
+        }
+
+        log('setting', key, '=', value);
+    }
+
+    function resetSettings() {
+        for (const key of Object.keys(DEFAULTS)) CFG[key] = DEFAULTS[key];
+        saveSettings();
+        releaseChrome();
+        restoreFlattenedCode();
+        injectCSS();
+        refreshSettingsUI();
+        scan();
+        if (CFG.autoScroll) resumeFollowing('reset');
+    }
+
+    function buildSettingsUI() {
+        if (settingsUI.el) return settingsUI.el;
+
+        const scrim = document.createElement('div');
+        scrim.id = AFX.scrimId;
+        scrim.setAttribute(AFX.ui, '1');
+        scrim.addEventListener('click', () => closeSettings());
+
+        const handle = document.createElement('button');
+        handle.id = AFX.settingsHandleId;
+        handle.type = 'button';
+        handle.setAttribute(AFX.ui, '1');
+        handle.setAttribute('aria-label', 'Focus Mode settings');
+        handle.title = 'Focus Mode settings (Alt+Shift+S)';
+        handle.setAttribute('aria-expanded', 'false');
+        handle.setAttribute('aria-controls', AFX.settingsId);
+        handle.innerHTML = ICON_GEAR;
+        handle.addEventListener('click', () => toggleSettings());
+
+        const panel = document.createElement('aside');
+        panel.id = AFX.settingsId;
+        panel.setAttribute(AFX.ui, '1');
+        panel.setAttribute('role', 'dialog');
+        panel.setAttribute('aria-modal', 'false');
+        panel.setAttribute('aria-label', 'Focus Mode settings');
+        panel.setAttribute('data-afx-open', '0');
+        panel.dataset.afxTheme = isDarkTheme() ? 'dark' : 'light';
+
+        const head = document.createElement('div');
+        head.className = 'afx-set-head';
+
+        const title = document.createElement('h2');
+        title.textContent = 'Focus Mode';
+
+        const version = document.createElement('span');
+        version.className = 'afx-set-ver';
+        version.textContent = 'v' + (typeof GM_info !== 'undefined' && GM_info.script ? GM_info.script.version : '1.5.0');
+
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'afx-icon-btn';
+        close.setAttribute('aria-label', 'Close settings');
+        close.innerHTML = ICON_CLOSE;
+        close.addEventListener('click', () => closeSettings());
+
+        head.append(title, version, close);
+
+        const body = document.createElement('div');
+        body.className = 'afx-set-body';
+
+        for (const section of SETTINGS_SCHEMA) {
+            const wrap = document.createElement('section');
+            wrap.className = 'afx-set-section';
+
+            const heading = document.createElement('h3');
+            heading.textContent = section.title;
+            wrap.appendChild(heading);
+
+            for (const item of section.items) {
+                wrap.appendChild(buildSettingRow(item));
+            }
+            body.appendChild(wrap);
+        }
+
+        const note = document.createElement('p');
+        note.className = 'afx-set-note';
+        note.textContent = 'Changes apply immediately and are remembered on this device. ' +
+            'Turning an option off restores Arena\u2019s own layout for it.';
+
+        const foot = document.createElement('div');
+        foot.className = 'afx-set-foot';
+
+        const reset = document.createElement('button');
+        reset.type = 'button';
+        reset.className = 'afx-btn';
+        reset.textContent = 'Reset to defaults';
+        reset.addEventListener('click', resetSettings);
+
+        foot.appendChild(reset);
+
+        panel.append(head, body, note, foot);
+
+        document.body.append(scrim, handle, panel);
+        settingsUI.el = panel;
+        settingsUI.handle = handle;
+        settingsUI.scrim = scrim;
+        return panel;
+    }
+
+    function buildSettingRow(item) {
+        const row = document.createElement('div');
+        row.className = 'afx-set-row';
+
+        const textWrap = document.createElement('div');
+        textWrap.className = 'afx-set-text';
+
+        const label = document.createElement('label');
+        label.className = 'afx-set-label';
+        label.textContent = item.label;
+
+        const desc = document.createElement('span');
+        desc.className = 'afx-set-desc';
+        desc.textContent = item.desc || '';
+
+        textWrap.append(label, desc);
+        row.appendChild(textWrap);
+
+        if (item.kind === 'range') {
+            const wrap = document.createElement('div');
+            wrap.className = 'afx-range';
+
+            const input = document.createElement('input');
+            input.type = 'range';
+            input.min = String(item.min);
+            input.max = String(item.max);
+            input.step = String(item.step);
+            input.value = String(CFG[item.key]);
+            input.setAttribute('aria-label', item.label);
+            input.dataset.afxKey = item.key;
+
+            const out = document.createElement('output');
+            out.dataset.afxOut = item.key;
+            out.textContent = CFG[item.key] + (item.unit ? ' ' + item.unit : '');
+
+            input.addEventListener('input', () => {
+                const value = Number(input.value);
+                out.textContent = value + (item.unit ? ' ' + item.unit : '');
+                applySetting(item.key, value);
+            });
+
+            wrap.append(input, out);
+            row.appendChild(wrap);
+            return row;
+        }
+
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = !!CFG[item.key];
+        input.setAttribute('role', 'switch');
+        input.setAttribute('aria-label', item.label);
+        input.dataset.afxKey = item.key;
+        input.addEventListener('change', () => applySetting(item.key, input.checked));
+
+        row.appendChild(input);
+        return row;
+    }
+
+    /** Push CFG back into the controls (used after reset / external changes). */
+    function refreshSettingsUI() {
+        const panel = settingsUI.el;
+        if (!panel) return;
+        panel.dataset.afxTheme = isDarkTheme() ? 'dark' : 'light';
+        for (const input of $$('input[data-afx-key]', panel)) {
+            const key = input.dataset.afxKey;
+            if (!(key in CFG)) continue;
+            if (input.type === 'checkbox') {
+                input.checked = !!CFG[key];
+            } else {
+                input.value = String(CFG[key]);
+                const out = panel.querySelector('[data-afx-out="' + key + '"]');
+                if (out) {
+                    const item = SETTINGS_SCHEMA.flatMap((section) => section.items)
+                        .find((entry) => entry.key === key);
+                    out.textContent = CFG[key] + (item && item.unit ? ' ' + item.unit : '');
+                }
+            }
+        }
+    }
+
+    function openSettings() {
+        buildSettingsUI();
+        refreshSettingsUI();
+        settingsUI.open = true;
+        settingsUI.el.setAttribute('data-afx-open', '1');
+        settingsUI.scrim.setAttribute('data-afx-open', '1');
+        settingsUI.handle.hidden = true;
+        settingsUI.handle.setAttribute('aria-expanded', 'true');
+        const first = settingsUI.el.querySelector('input[data-afx-key]');
+        if (first && typeof first.focus === 'function') {
+            try { first.focus({ preventScroll: true }); } catch (_e) { first.focus(); }
+        }
+    }
+
+    function closeSettings() {
+        if (!settingsUI.el) return;
+        settingsUI.open = false;
+        settingsUI.el.setAttribute('data-afx-open', '0');
+        settingsUI.scrim.setAttribute('data-afx-open', '0');
+        settingsUI.handle.hidden = false;
+        settingsUI.handle.setAttribute('aria-expanded', 'false');
+    }
+
+    function toggleSettings(force) {
+        const next = typeof force === 'boolean' ? force : !settingsUI.open;
+        if (next) openSettings();
+        else closeSettings();
+        return next;
+    }
+
+    function installSettingsShortcut() {
+        document.addEventListener('keydown', (ev) => {
+            if (ev.altKey && ev.shiftKey && (ev.key === 'S' || ev.key === 's')) {
+                ev.preventDefault();
+                toggleSettings();
+                return;
+            }
+            if (ev.key === 'Escape' && settingsUI.open) {
+                // Do not swallow Escape for Arena when the panel is closed.
+                ev.stopPropagation();
+                closeSettings();
+            }
+        }, true);
+    }
+
+    // ════════════════════════════════════════════════════════════════
     // SCAN + BOOT
     // ════════════════════════════════════════════════════════════════
+
+    /** Keep the settings UI mounted even if React replaces body children. */
+    function ensureSettingsMounted() {
+        if (!settingsUI.el || settingsUI.el.isConnected) return;
+        const { el, handle, scrim } = settingsUI;
+        document.body.append(scrim, handle, el);
+    }
 
     function scan() {
         ensureFollowBinding();
@@ -2233,6 +2910,8 @@ clone.outerHTML + '\n' +
         if (CFG.preventZoom) installZoomLock();
         installFollowListeners();
         installReviewWatcher();
+        buildSettingsUI();
+        installSettingsShortcut();
 
         scan();
         // Arena is a SPA: poll for the log / composer / nav to appear, move,
@@ -2268,6 +2947,15 @@ clone.outerHTML + '\n' +
         confirmReview: () => confirmTaskReview(),
         /** Print what the task-review panel detection sees. */
         debugReview: debugReview,
+        /** Settings side panel. */
+        settingsPanel: {
+            open: openSettings,
+            close: closeSettings,
+            toggle: toggleSettings,
+            reset: resetSettings,
+            isOpen: () => settingsUI.open,
+            releaseChrome,
+        },
         config: CFG,
         _internals: {
             findComposer, findComposerBar, ensureComposerPinned, composer,
