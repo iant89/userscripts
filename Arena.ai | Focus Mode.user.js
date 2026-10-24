@@ -438,8 +438,29 @@
 
     // ── Arena's scroll-down arrow ───────────────────────────────────
 
+    // Arena's control is:
+    //   <button aria-label="Scroll to bottom" class="... px-3 py-1 text-xs
+    //           ... backdrop-blur-md shadow-md"><svg .../></button>
+    // It floats, centred, just above the composer.
+    const ARROW_LABEL_EXACT = [
+        'scroll to bottom',
+        'scroll to the bottom',
+        'scroll down',
+        'jump to bottom',
+        'jump to latest',
+        'go to bottom',
+        'back to bottom',
+    ];
+
     const ARROW_LABEL = /(scroll|jump|go)\s*(back\s*)?(to\s*)?(the\s*)?(bottom|down|latest|newest)|latest\s*(message|response|reply)|new\s*(messages?|responses?)|bottom\s*of\s*(the\s*)?(chat|conversation)/i;
-    const NOT_ARROW_LABEL = /^(send|attach|stop|upload|record|mic|model|settings|search|share|menu|close|download|copy|retry|edit)\b/i;
+    // Any label mentioning a composer/nav control wins over the geometry
+    // fallback, so the model picker or send button can never re-arm following.
+    const NOT_ARROW_LABEL = /(send|attach|stop|upload|record|mic|voice|model|settings|search|share|menu|close|download|copy|retry|edit|new chat|agent|plan)/i;
+
+    function classish(el) {
+        if (!isElement(el)) return '';
+        return typeof el.className === 'string' ? el.className : (el.getAttribute('class') || '');
+    }
 
     function positionedAncestor(el, levels = 4) {
         let node = el;
@@ -450,22 +471,31 @@
         return null;
     }
 
+    /** Floating-overlay tell-tales in Arena's Tailwind classes. */
+    function looksFloating(el) {
+        const chain = classish(el) + ' ' + classish(el.parentElement);
+        return /(^|\s)(absolute|fixed|sticky)(\s|$)|backdrop-blur|shadow-(md|lg|xl|2xl)/.test(chain);
+    }
+
     /**
      * Decide whether a click landed on Arena's "scroll to bottom" control.
-     * Primary signal is its accessible name; geometry is the fallback:
-     * the arrow is small, horizontally centred on the log, and sits in the
-     * lower part of the viewport, just above the composer.
+     * Primary signal is the accessible name; geometry is the fallback for
+     * the case where the label changes: the arrow is small, horizontally
+     * centred on the log, and sits in the lower part of the viewport just
+     * above the composer.
      */
     function isArenaScrollArrow(target) {
         const el = target.closest('button, [role="button"], a, [tabindex]') || target;
         if (!isElement(el) || isOurs(el)) return false;
 
-        const label = [
+        const rawLabel = [
             el.getAttribute('aria-label'),
             el.getAttribute('title'),
-            text(el).slice(0, 60),
         ].filter(Boolean).join(' ').trim();
+        const label = rawLabel || text(el).slice(0, 60);
+        const normalised = label.toLowerCase().replace(/\s+/g, ' ').trim();
 
+        if (normalised && ARROW_LABEL_EXACT.indexOf(normalised) !== -1) return true;
         if (label && ARROW_LABEL.test(label)) return true;
         if (label && NOT_ARROW_LABEL.test(label)) return false;
 
@@ -482,7 +512,7 @@
         if (Math.abs((r.left + r.width / 2) - centre) > Math.max(64, sr.width * 0.22)) return false;
         if (r.top < viewportBottom() * 0.55) return false;
 
-        return !!positionedAncestor(el);
+        return !!positionedAncestor(el) || looksFloating(el);
     }
 
     // ── Binding ──────────────────────────────────────────────────────
