@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Arena.ai | Focus Mode
 // @namespace    https://arena.ai/
-// @version      1.3.0
+// @version      1.5.0
 // @author       Piknockyou (vibe-coded)
 // @license      AGPL-3.0
-// @description  Keeps an Arena conversation flowing: sticky auto-scroll that pauses the moment you interact and resumes when you click Arena's scroll-down arrow, locked zoom, a navbar pinned to the top, a composer pinned to the bottom and widened to fit the viewport, the diff viewer widened to fit it too, a flattened/optimized DOM, and one-click HTML export of the whole conversation (theme + layout preserved, folding still works).
+// @description  Keeps an Arena conversation flowing: sticky auto-scroll that pauses the moment you interact and resumes when you click Arena's scroll-down arrow, locked zoom, a navbar pinned to the top, a composer pinned to the bottom and widened to fit the viewport, the diff viewer widened to fit it too, a flattened/optimized DOM, one-click HTML export of the whole conversation (theme + layout preserved, folding still works), and a slide-out settings menu.
 // @match        *://*.arena.ai/*
 // @match        *://*.canaryarena.ai/*
 // @match        *://chat.lmsys.org/*
@@ -14,10 +14,10 @@
 // ==/UserScript==
 
 /* ══════════════════════════════════════════════════════════════════
- * Arena.ai | Focus Mode — v1.3.0
+ * Arena.ai | Focus Mode — v1.5.0
  * ══════════════════════════════════════════════════════════════════
  *
- * A deliberately small script with four jobs:
+ * A deliberately small script with five jobs:
  *
  *   1. FOLLOW    Auto-scroll the message log while Arena streams. The
  *                moment the user does anything that means "I want to
@@ -47,6 +47,12 @@
  *                active theme, and a tiny vanilla shim that keeps the
  *                reasoning / tool-output folds (Radix collapsibles and
  *                native <details>) working in the exported file.
+ *
+ *   5. SETTINGS  A small gear tab on the right edge of the viewport
+ *                expands into a drawer with every option, grouped into
+ *                Features / Interface / Performance / Advanced tabs. Changes
+ *                are saved to localStorage and most apply immediately;
+ *                the drawer says when one needs a reload.
  *
  * Plus DOM optimisation: Shiki code blocks are flattened from tens of
  * thousands of spans to plain text, empty inline wrappers are unwrapped,
@@ -101,12 +107,52 @@
     };
 
     const MARKER = '/* Arena.ai | Focus Mode */';
+    const VERSION = '1.5.0';
 
     const AFX = {
         styleId: 'afx-style',
         exportBtnId: 'afx-nav-export',
+        settingsId: 'afx-settings',
         ui: 'data-afx-ui',
     };
+
+    // ════════════════════════════════════════════════════════════════
+    // SAVED SETTINGS
+    // ════════════════════════════════════════════════════════════════
+    //
+    // The settings menu writes overrides of CFG to localStorage. Only keys
+    // that differ from the defaults above are stored, so changing a default
+    // in a new version still reaches anyone who never touched that setting.
+
+    const SETTINGS_KEY = 'afx-focus-mode-settings';
+    const DEFAULTS = Object.assign({}, CFG);
+
+    function loadSettings() {
+        let saved = null;
+        try {
+            saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+        } catch (_e) {}
+        if (!saved || typeof saved !== 'object') return;
+        for (const key of Object.keys(saved)) {
+            if (!(key in DEFAULTS) || typeof saved[key] !== typeof DEFAULTS[key]) continue;
+            CFG[key] = saved[key];
+        }
+    }
+
+    function saveSettings() {
+        const overrides = {};
+        for (const key of Object.keys(DEFAULTS)) {
+            if (CFG[key] !== DEFAULTS[key]) overrides[key] = CFG[key];
+        }
+        try {
+            if (Object.keys(overrides).length) localStorage.setItem(SETTINGS_KEY, JSON.stringify(overrides));
+            else localStorage.removeItem(SETTINGS_KEY);
+        } catch (_e) {}
+    }
+
+    loadSettings();
+    // What this page load booted with; some settings only fully apply on reload.
+    const BOOT_CFG = Object.assign({}, CFG);
 
     const log = (...args) => { if (CFG.verbose) console.log('[FocusMode]', ...args); };
 
@@ -199,11 +245,15 @@
                     [class*="transition-[max-height]"] { transition: none !important; }
                 `;
             }
+            if (CFG.killBlurs) {
+                css += `
+                    [class*="backdrop-blur"], [style*="backdrop-filter"] {
+                        backdrop-filter: none !important;
+                        -webkit-backdrop-filter: none !important;
+                    }
+                `;
+            }
             css += `
-                [class*="backdrop-blur"], [style*="backdrop-filter"] {
-                    backdrop-filter: none !important;
-                    -webkit-backdrop-filter: none !important;
-                }
                 [role="log"] > * { contain: layout style; }
                 [role="log"] pre { contain: layout style; }
                 .afx-cv { content-visibility: auto; contain-intrinsic-size: auto 240px; }
@@ -280,7 +330,7 @@
                 background: rgba(127,127,127,.14);
             }
             @media print { #${AFX.exportBtnId} { display: none !important; } }
-        `;
+        ` + buildSettingsCSS();
 
         return css;
     }
@@ -302,7 +352,10 @@
 
     function installZoomLock() {
         // Ctrl/⌘ + wheel (also how trackpad pinch is reported on most desktops).
+        // Always installed; every handler checks CFG.preventZoom so the
+        // settings menu can switch the lock on and off without a reload.
         window.addEventListener('wheel', (ev) => {
+            if (!CFG.preventZoom) return;
             if (!ev.ctrlKey && !ev.metaKey) return;
             ev.preventDefault();
             ev.stopPropagation();
@@ -310,6 +363,7 @@
 
         // Ctrl/⌘ + '+' / '-' / '0'.
         window.addEventListener('keydown', (ev) => {
+            if (!CFG.preventZoom) return;
             if (!(ev.ctrlKey || ev.metaKey) || ev.altKey) return;
             const key = ev.key;
             if (key === '+' || key === '=' || key === '-' || key === '_' || key === '0') {
@@ -320,18 +374,26 @@
 
         // Safari pinch gestures.
         ['gesturestart', 'gesturechange', 'gestureend'].forEach((type) => {
-            window.addEventListener(type, (ev) => ev.preventDefault(), { passive: false });
+            window.addEventListener(type, (ev) => { if (CFG.preventZoom) ev.preventDefault(); }, { passive: false });
         });
 
         // Two-finger pinch on touch devices.
         window.addEventListener('touchmove', (ev) => {
-            if (ev.touches && ev.touches.length > 1) ev.preventDefault();
+            if (CFG.preventZoom && ev.touches && ev.touches.length > 1) ev.preventDefault();
         }, { passive: false, capture: true });
 
         // Belt and braces: a non-scalable viewport meta, re-applied if Arena
         // ever replaces the head contents during a route change.
+        let originalMeta;
         const lockMeta = () => {
             let meta = document.querySelector('meta[name="viewport"]');
+            if (originalMeta === undefined) originalMeta = meta ? meta.getAttribute('content') : null;
+            if (!CFG.preventZoom) {
+                // Hand Arena's own viewport meta back once the lock is off.
+                const restore = originalMeta || 'width=device-width, initial-scale=1';
+                if (meta && meta.getAttribute('content') !== restore) meta.setAttribute('content', restore);
+                return;
+            }
             if (!meta) {
                 meta = document.createElement('meta');
                 meta.setAttribute('name', 'viewport');
@@ -342,7 +404,10 @@
         };
         lockMeta();
         setInterval(lockMeta, 4000);
+        zoomLockMeta = lockMeta;
     }
+
+    let zoomLockMeta = null;
 
     // ════════════════════════════════════════════════════════════════
     // ARENA DOM SHAPE HELPERS
@@ -595,6 +660,7 @@
 
         // ── Deliberate interventions ────────────────────────────────
         on(scroller, 'wheel', (ev) => {
+            if (isOurs(ev.target)) return;
             if (ev.deltaY < 0) stopFollowing('wheel up');
         }, { passive: true });
 
@@ -603,6 +669,7 @@
             touchY = ev.touches && ev.touches[0] ? ev.touches[0].clientY : 0;
         }, { passive: true });
         on(scroller, 'touchmove', (ev) => {
+            if (isOurs(ev.target)) return;
             const t = ev.touches && ev.touches[0];
             if (!t) return;
             if (t.clientY - touchY > 6) stopFollowing('touch drag');
@@ -611,7 +678,7 @@
 
         on(scroller, 'mousedown', (ev) => {
             const target = ev.target;
-            if (!isElement(target)) return;
+            if (!isElement(target) || isOurs(target)) return;
             if (target.closest('button,a,[role="button"],input,textarea,select,[contenteditable="true"]')) return;
             stopFollowing('pointer down in log');
         }, { passive: true });
@@ -646,6 +713,7 @@
         document.addEventListener('keydown', (ev) => {
             const target = ev.target;
             if (isElement(target) && target.closest('input,textarea,select,[contenteditable="true"]')) return;
+            if (isOurs(target)) return;
             if (ev.key === 'PageUp' || ev.key === 'Home' || ev.key === 'ArrowUp') stopFollowing('key ' + ev.key);
         }, { passive: true, capture: true });
 
@@ -696,11 +764,25 @@
 
     const composer = { el: null, bar: null, pinned: false, lastCheck: 0 };
 
+    // Text fields that belong to a code editor or the workspace/diff panel,
+    // never to the composer (CodeMirror's role="textbox", Monaco's textarea).
+    const EDITOR_FIELD_HINTS =
+        '.cm-editor, .monaco-editor, .CodeMirror, [class*="monaco" i], [class*="codemirror" i]';
+
+    function isComposerField(el) {
+        if (el.matches('[readonly], [aria-readonly="true"], [aria-hidden="true"]')) return false;
+        if (el.closest(EDITOR_FIELD_HINTS)) return false;
+        if (diffview.el && diffview.el.contains(el)) return false;
+        if (el.closest('[data-afx-diff="1"]')) return false;
+        return true;
+    }
+
     function findComposer() {
         const candidates = [];
         const nodes = $$('[role="textbox"], textarea, [contenteditable="true"], [role="composer"]');
         for (const el of nodes) {
             if (isOurs(el) || !isVisible(el)) continue;
+            if (!isComposerField(el)) continue;
             const r = el.getBoundingClientRect();
             if (r.width < 80 || r.height < 16) continue;
             candidates.push({ el, bottom: r.bottom });
@@ -1128,11 +1210,27 @@
         return true; // no explicit state: fall back to visibility checks
     }
 
+    /**
+     * Whether an element is, sits inside, or wraps the composer. The composer
+     * is often a tall floating bar (especially once pinned), so without this
+     * the generic panel/dialog fallback can grab its text field.
+     */
+    function touchesComposer(el) {
+        if (el.closest('[data-afx-composer="1"], [data-afx-pinned="1"]')) return true;
+        if (el.querySelector('[data-afx-composer="1"], [data-afx-pinned="1"]')) return true;
+        if (el.matches('textarea, input, [role="textbox"], [contenteditable="true"]')) return true;
+        for (const part of [composer.el, composer.bar]) {
+            if (!part || !part.isConnected) continue;
+            if (part === el || part.contains(el) || el.contains(part)) return true;
+        }
+        return false;
+    }
+
     function isPanelCandidate(el, vw) {
         if (!isElement(el) || isOurs(el)) return false;
         if (el.closest('[role="log"]')) return false;
         if (el.querySelector('[role="log"]')) return false;
-        if (el.closest('[data-afx-composer="1"]')) return false;
+        if (touchesComposer(el)) return false;
         if (el.id === AFX.exportBtnId) return false;
         if (!isVisible(el)) return false;
         const rect = el.getBoundingClientRect();
@@ -1971,6 +2069,702 @@ clone.outerHTML + '\n' +
     }
 
     // ════════════════════════════════════════════════════════════════
+    // 5. SETTINGS MENU
+    // ════════════════════════════════════════════════════════════════
+    //
+    // A small tab on the right edge of the viewport expands into a drawer
+    // holding every CFG option. Changes are saved straight away. Most apply
+    // live; the few that undo layout work done earlier on the page (or that
+    // set up timers at boot) ask for a reload instead of half-applying.
+
+    // The drawer is split into tabs, each holding one or more sections.
+    // reload: 'off'    → switching it on applies live, switching it off needs a reload
+    // reload: 'always' → any change needs a reload
+    // requires         → greyed out while that other setting is off
+    const SETTINGS_TABS = [
+        {
+            id: 'features',
+            label: 'Features',
+            sections: [
+                {
+                    title: 'Auto-scroll',
+                    items: [
+                        { key: 'autoScroll', label: 'Auto-scroll while streaming',
+                            hint: 'Stays on the newest message until you scroll up, select text or press PageUp/Home.' },
+                        { key: 'resumeOnArrow', label: 'Resume on the scroll-down arrow', requires: 'autoScroll',
+                            hint: "Clicking Arena's round arrow above the composer turns following back on." },
+                        { key: 'followThreshold', label: 'Bottom threshold', type: 'number', unit: 'px',
+                            min: 0, max: 2000, step: 10, requires: 'autoScroll',
+                            hint: 'How close to the bottom still counts as "at the bottom".' },
+                    ],
+                },
+                {
+                    title: 'Zoom',
+                    items: [
+                        { key: 'preventZoom', label: 'Lock page zoom',
+                            hint: 'Blocks Ctrl/⌘ + wheel, Ctrl/⌘ +/−/0 and pinch zoom.' },
+                    ],
+                },
+                {
+                    title: 'HTML export',
+                    items: [
+                        { key: 'exportMaxCSSBytes', label: 'Stylesheet size limit', type: 'number', unit: 'MB',
+                            scale: 1024 * 1024, min: 0.5, max: 64, step: 0.5,
+                            hint: 'How much of Arena\'s CSS is copied into an exported file.' },
+                    ],
+                },
+            ],
+        },
+        {
+            id: 'interface',
+            label: 'Interface',
+            sections: [
+                {
+                    title: 'Composer',
+                    items: [
+                        { key: 'pinComposer', label: 'Pin composer to the bottom', reload: 'off' },
+                        { key: 'wideComposer', label: 'Full-width composer', reload: 'off' },
+                    ],
+                },
+                {
+                    title: 'Navbar',
+                    items: [
+                        { key: 'pinTopNav', label: 'Pin navbar to the top', reload: 'off' },
+                        { key: 'showExportButton', label: 'Show export button',
+                            hint: 'Download icon next to the diff-browser control.' },
+                    ],
+                },
+                {
+                    title: 'Diff viewer',
+                    items: [
+                        { key: 'wideDiffViewer', label: 'Full-width diff viewer', reload: 'off' },
+                    ],
+                },
+            ],
+        },
+        {
+            id: 'performance',
+            label: 'Performance',
+            sections: [
+                {
+                    title: 'Message optimiser',
+                    items: [
+                        { key: 'optimizeDOM', label: 'Optimise idle messages', reload: 'off',
+                            hint: 'Master switch for everything else on this tab.' },
+                        { key: 'flattenCode', label: 'Flatten highlighted code blocks', requires: 'optimizeDOM', reload: 'off',
+                            hint: 'Turns syntax-highlighted code into plain text once a message is idle.' },
+                        { key: 'unwrapEmptySpans', label: 'Unwrap empty inline wrappers', requires: 'optimizeDOM', reload: 'off' },
+                        { key: 'contentVisibility', label: 'Skip rendering off-screen messages', requires: 'optimizeDOM', reload: 'off' },
+                        { key: 'idleBeforeOptimize', label: 'Idle time before optimising', type: 'number', unit: 's',
+                            scale: 1000, min: 0.5, max: 60, step: 0.5, requires: 'optimizeDOM' },
+                    ],
+                },
+                {
+                    title: 'Effects',
+                    items: [
+                        { key: 'killTransitions', label: 'Disable animations', requires: 'optimizeDOM' },
+                        { key: 'killBlurs', label: 'Disable backdrop blur', requires: 'optimizeDOM' },
+                    ],
+                },
+            ],
+        },
+        {
+            id: 'advanced',
+            label: 'Advanced',
+            sections: [
+                {
+                    title: 'Timers',
+                    items: [
+                        { key: 'idleFollowPoll', label: 'Follow safety poll', type: 'number', unit: 'ms',
+                            min: 200, max: 10000, step: 50, reload: 'always' },
+                        { key: 'sweepInterval', label: 'Optimiser sweep interval', type: 'number', unit: 'ms',
+                            min: 500, max: 60000, step: 500, reload: 'always' },
+                    ],
+                },
+                {
+                    title: 'Diagnostics',
+                    items: [
+                        { key: 'verbose', label: 'Verbose console logging' },
+                    ],
+                },
+            ],
+        },
+    ];
+
+    /** Every setting item across all tabs and sections. */
+    function settingsItems(tab) {
+        const tabs = tab ? [tab] : SETTINGS_TABS;
+        const items = [];
+        for (const t of tabs) for (const section of t.sections) items.push(...section.items);
+        return items;
+    }
+
+    const SETTINGS_OPEN_KEY = 'afx-focus-mode-settings-open';
+    const SETTINGS_TAB_KEY = 'afx-focus-mode-settings-tab';
+
+    const GEAR_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>' +
+        '<circle cx="12" cy="12" r="3"/></svg>';
+
+    const CLOSE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+        'stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+
+    const settingsUI = {
+        root: null, tab: null, drawer: null, body: null, closeBtn: null, reloadBar: null,
+        rows: new Map(),
+        tabs: new Map(),   // tab id -> { button, panel, dot }
+        activeTab: null,
+    };
+
+    function buildSettingsCSS() {
+        const root = '#' + AFX.settingsId;
+        const dark = `
+            --afx-bg: #18181b;
+            --afx-fg: #f4f4f5;
+            --afx-muted: #a1a1aa;
+            --afx-border: rgba(255,255,255,.10);
+            --afx-hover: rgba(255,255,255,.06);
+            --afx-track: #3f3f46;
+            --afx-accent: #3b82f6;
+            --afx-shadow: rgba(0,0,0,.5);
+        `;
+        return `
+            /* ── Settings drawer ── */
+            ${root} {
+                --afx-bg: #ffffff;
+                --afx-fg: #18181b;
+                --afx-muted: #71717a;
+                --afx-border: rgba(0,0,0,.10);
+                --afx-hover: rgba(0,0,0,.05);
+                --afx-track: #d4d4d8;
+                --afx-accent: #2563eb;
+                --afx-shadow: rgba(0,0,0,.18);
+                position: fixed !important;
+                top: 0; right: 0; bottom: 0;
+                width: min(340px, 100vw);
+                z-index: 2147483000 !important;
+                transform: translateX(100%);
+                transition: transform .22s cubic-bezier(.2,.8,.2,1) !important;
+                pointer-events: none;
+                font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                color: var(--afx-fg);
+                text-align: left;
+            }
+            @media (prefers-color-scheme: dark) {
+                html:not(.light):not([data-theme="light"]) ${root} { ${dark} }
+            }
+            html.dark ${root}, html[data-theme="dark"] ${root}, html[style*="color-scheme: dark"] ${root} { ${dark} }
+            ${root}[data-open="1"] { transform: none; }
+            ${root} *, ${root} *::before, ${root} *::after { box-sizing: border-box; }
+
+            ${root} .afx-s-tab {
+                position: absolute;
+                top: 50%;
+                left: -28px;
+                width: 28px;
+                height: 44px;
+                margin-top: -22px;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border: 1px solid var(--afx-border);
+                border-right: 0;
+                border-radius: 10px 0 0 10px;
+                background: var(--afx-bg);
+                color: var(--afx-muted);
+                box-shadow: -2px 0 8px var(--afx-shadow);
+                cursor: pointer;
+                pointer-events: auto;
+                opacity: .55;
+                transition: opacity .12s ease, color .12s ease !important;
+            }
+            ${root} .afx-s-tab:hover, ${root}[data-open="1"] .afx-s-tab { opacity: 1; color: var(--afx-fg); }
+            ${root} .afx-s-tab:focus-visible { outline: 2px solid var(--afx-accent); outline-offset: -2px; opacity: 1; }
+            ${root} .afx-s-tab svg { width: 16px; height: 16px; display: block; transition: transform .22s ease !important; }
+            ${root}[data-open="1"] .afx-s-tab svg { transform: rotate(90deg); }
+
+            ${root} .afx-s-drawer {
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                background: var(--afx-bg);
+                border-left: 1px solid var(--afx-border);
+                box-shadow: -8px 0 24px var(--afx-shadow);
+                pointer-events: auto;
+            }
+
+            ${root} .afx-s-head {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                padding: 14px 16px;
+                border-bottom: 1px solid var(--afx-border);
+            }
+            ${root} .afx-s-title { font-size: 15px; font-weight: 600; }
+            ${root} .afx-s-sub { color: var(--afx-muted); font-size: 12px; }
+            ${root} .afx-s-icon-btn {
+                width: 30px; height: 30px; padding: 0;
+                display: inline-flex; align-items: center; justify-content: center;
+                border: 0; border-radius: 8px;
+                background: transparent; color: var(--afx-muted);
+                cursor: pointer;
+            }
+            ${root} .afx-s-icon-btn:hover { background: var(--afx-hover); color: var(--afx-fg); }
+            ${root} .afx-s-icon-btn:focus-visible { outline: 2px solid var(--afx-accent); }
+            ${root} .afx-s-icon-btn svg { width: 16px; height: 16px; }
+
+            ${root} .afx-s-tabs {
+                display: flex;
+                gap: 2px;
+                padding: 8px 12px 0;
+                border-bottom: 1px solid var(--afx-border);
+            }
+            ${root} .afx-s-tabbtn {
+                position: relative;
+                flex: 1 1 auto;
+                min-width: 0;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 5px;
+                margin: 0 0 -1px;
+                padding: 8px 6px 9px;
+                border: 0;
+                border-bottom: 2px solid transparent;
+                border-radius: 6px 6px 0 0;
+                background: transparent;
+                color: var(--afx-muted);
+                font: inherit;
+                font-size: 12px;
+                font-weight: 500;
+                white-space: nowrap;
+                cursor: pointer;
+            }
+            ${root} .afx-s-tabbtn > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+            ${root} .afx-s-tabbtn:hover { color: var(--afx-fg); background: var(--afx-hover); }
+            ${root} .afx-s-tabbtn[aria-selected="true"] { color: var(--afx-fg); border-bottom-color: var(--afx-accent); }
+            ${root} .afx-s-tabbtn:focus-visible { outline: 2px solid var(--afx-accent); outline-offset: -2px; }
+            ${root} .afx-s-dot {
+                flex: 0 0 auto;
+                width: 6px; height: 6px;
+                border-radius: 50%;
+                background: var(--afx-accent);
+            }
+            ${root} .afx-s-dot[hidden] { display: none; }
+            ${root} .afx-s-panel[hidden] { display: none; }
+
+            ${root} .afx-s-body { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: 4px 0 12px; }
+            ${root} .afx-s-section { padding: 10px 16px 4px; }
+            ${root} .afx-s-section-title {
+                margin: 0 0 4px;
+                font-size: 11px;
+                font-weight: 600;
+                letter-spacing: .06em;
+                text-transform: uppercase;
+                color: var(--afx-muted);
+            }
+            ${root} .afx-s-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                margin: 0 -8px;
+                padding: 8px;
+                border-radius: 8px;
+                cursor: pointer;
+            }
+            ${root} .afx-s-row:hover { background: var(--afx-hover); }
+            ${root} .afx-s-row[data-disabled="1"] { opacity: .45; cursor: default; }
+            ${root} .afx-s-row[data-disabled="1"]:hover { background: transparent; }
+            ${root} .afx-s-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+            ${root} .afx-s-label { font-weight: 500; }
+            ${root} .afx-s-hint { color: var(--afx-muted); font-size: 12px; }
+            ${root} .afx-s-badge {
+                margin-left: 6px;
+                padding: 0 5px;
+                border-radius: 4px;
+                font-size: 10px;
+                font-weight: 600;
+                vertical-align: 1px;
+                color: var(--afx-accent);
+                border: 1px solid currentColor;
+            }
+
+            ${root} .afx-s-switch {
+                appearance: none;
+                -webkit-appearance: none;
+                flex: 0 0 auto;
+                position: relative;
+                width: 34px;
+                height: 20px;
+                margin: 0;
+                border-radius: 999px;
+                background: var(--afx-track);
+                cursor: inherit;
+                transition: background-color .15s ease !important;
+            }
+            ${root} .afx-s-switch::after {
+                content: "";
+                position: absolute;
+                top: 2px; left: 2px;
+                width: 16px; height: 16px;
+                border-radius: 50%;
+                background: #fff;
+                box-shadow: 0 1px 2px rgba(0,0,0,.3);
+                transition: transform .15s ease !important;
+            }
+            ${root} .afx-s-switch:checked { background: var(--afx-accent); }
+            ${root} .afx-s-switch:checked::after { transform: translateX(14px); }
+            ${root} .afx-s-switch:focus-visible { outline: 2px solid var(--afx-accent); outline-offset: 2px; }
+
+            ${root} .afx-s-num { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; color: var(--afx-muted); }
+            ${root} .afx-s-num input {
+                width: 76px;
+                padding: 4px 6px;
+                border: 1px solid var(--afx-border);
+                border-radius: 6px;
+                background: transparent;
+                color: var(--afx-fg);
+                font: inherit;
+                text-align: right;
+            }
+            ${root} .afx-s-num input:focus { outline: 2px solid var(--afx-accent); outline-offset: -1px; }
+
+            ${root} .afx-s-reload {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                margin: 0 12px 10px;
+                padding: 10px 12px;
+                border-radius: 8px;
+                background: color-mix(in srgb, var(--afx-accent) 14%, transparent);
+                font-size: 12px;
+            }
+            ${root} .afx-s-reload[hidden] { display: none; }
+            ${root} .afx-s-foot {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                padding: 10px 16px 14px;
+                border-top: 1px solid var(--afx-border);
+                color: var(--afx-muted);
+                font-size: 12px;
+            }
+            ${root} .afx-s-btn {
+                padding: 6px 10px;
+                border: 1px solid var(--afx-border);
+                border-radius: 8px;
+                background: transparent;
+                color: var(--afx-fg);
+                font: inherit;
+                font-weight: 500;
+                cursor: pointer;
+            }
+            ${root} .afx-s-btn:hover { background: var(--afx-hover); }
+            ${root} .afx-s-btn:focus-visible { outline: 2px solid var(--afx-accent); }
+            ${root} .afx-s-btn-primary { border-color: transparent; background: var(--afx-accent); color: #fff; }
+            ${root} .afx-s-btn-primary:hover { background: var(--afx-accent); filter: brightness(1.1); }
+
+            @media print { ${root} { display: none !important; } }
+        `;
+    }
+
+    function schemaItem(key) {
+        return settingsItems().find((item) => item.key === key) || null;
+    }
+
+    function needsReload() {
+        for (const item of settingsItems()) {
+            if (!item.reload || CFG[item.key] === BOOT_CFG[item.key]) continue;
+            if (item.reload === 'always') return true;
+            if (item.reload === 'off' && BOOT_CFG[item.key] === true && CFG[item.key] === false) return true;
+        }
+        return false;
+    }
+
+    /** Push the side effects of one setting change into the running page. */
+    function applySettingLive(key) {
+        injectCSS();
+        if (key === 'autoScroll') {
+            if (CFG.autoScroll) resumeFollowing('settings');
+            else stopFollowing('settings');
+        }
+        if (key === 'preventZoom' && zoomLockMeta) zoomLockMeta();
+        if (key === 'showExportButton' && !CFG.showExportButton) {
+            const btn = document.getElementById(AFX.exportBtnId);
+            if (btn) btn.remove();
+        }
+        if (key === 'optimizeDOM' || key === 'flattenCode' || key === 'unwrapEmptySpans' ||
+            key === 'contentVisibility' || key === 'idleBeforeOptimize') {
+            optimizeSweep();
+        }
+        scan();
+    }
+
+    function setSetting(key, value) {
+        if (!(key in DEFAULTS) || typeof value !== typeof DEFAULTS[key]) return false;
+        if (typeof value === 'number' && !isFinite(value)) return false;
+        if (CFG[key] === value) return true;
+        CFG[key] = value;
+        saveSettings();
+        log('setting', key, '=', value);
+        applySettingLive(key);
+        refreshSettingsUI();
+        return true;
+    }
+
+    function resetSettings() {
+        const changed = Object.keys(DEFAULTS).filter((key) => CFG[key] !== DEFAULTS[key]);
+        Object.assign(CFG, DEFAULTS);
+        saveSettings();
+        changed.forEach(applySettingLive);
+        refreshSettingsUI();
+    }
+
+    function refreshSettingsUI() {
+        if (!settingsUI.root) return;
+        for (const [key, row] of settingsUI.rows) {
+            const item = schemaItem(key);
+            const disabled = !!(item.requires && !CFG[item.requires]);
+            row.el.dataset.disabled = disabled ? '1' : '0';
+            row.input.disabled = disabled;
+            if (item.type === 'number') {
+                if (document.activeElement !== row.input) row.input.value = String(CFG[key] / (item.scale || 1));
+            } else {
+                row.input.checked = !!CFG[key];
+                row.input.setAttribute('aria-checked', String(!!CFG[key]));
+            }
+        }
+        // A dot on a tab marks that something on it differs from the defaults.
+        for (const t of SETTINGS_TABS) {
+            const entry = settingsUI.tabs.get(t.id);
+            if (!entry) continue;
+            const changed = settingsItems(t).some((item) => CFG[item.key] !== DEFAULTS[item.key]);
+            entry.dot.hidden = !changed;
+        }
+        settingsUI.reloadBar.hidden = !needsReload();
+    }
+
+    function selectSettingsTab(id, focus) {
+        const entry = settingsUI.tabs.get(id) || settingsUI.tabs.get(SETTINGS_TABS[0].id);
+        if (!entry) return;
+        for (const [tabId, other] of settingsUI.tabs) {
+            const active = other === entry;
+            other.button.setAttribute('aria-selected', String(active));
+            other.button.tabIndex = active ? 0 : -1;
+            other.panel.hidden = !active;
+            if (active) settingsUI.activeTab = tabId;
+        }
+        settingsUI.body.scrollTop = 0;
+        if (focus) entry.button.focus({ preventScroll: true });
+        try { localStorage.setItem(SETTINGS_TAB_KEY, settingsUI.activeTab); } catch (_e) {}
+    }
+
+    function buildSettingsTabs() {
+        const bar = make('div', 'afx-s-tabs');
+        bar.setAttribute('role', 'tablist');
+        bar.setAttribute('aria-label', 'Settings categories');
+
+        const panels = [];
+        for (const t of SETTINGS_TABS) {
+            const tabId = AFX.settingsId + '-tab-' + t.id;
+            const panelId = AFX.settingsId + '-panel-' + t.id;
+
+            const button = make('button', 'afx-s-tabbtn', { type: 'button', id: tabId });
+            button.setAttribute('role', 'tab');
+            button.setAttribute('aria-controls', panelId);
+            button.appendChild(make('span', '', { textContent: t.label }));
+            const dot = make('span', 'afx-s-dot', { hidden: true, title: 'Changed from the defaults' });
+            button.appendChild(dot);
+            button.addEventListener('click', () => selectSettingsTab(t.id));
+            bar.appendChild(button);
+
+            const panel = make('div', 'afx-s-panel', { id: panelId, hidden: true });
+            panel.setAttribute('role', 'tabpanel');
+            panel.setAttribute('aria-labelledby', tabId);
+            for (const section of t.sections) {
+                const box = make('section', 'afx-s-section');
+                box.appendChild(make('h3', 'afx-s-section-title', { textContent: section.title }));
+                section.items.forEach((item) => box.appendChild(buildSettingsRow(item)));
+                panel.appendChild(box);
+            }
+            panels.push(panel);
+
+            settingsUI.tabs.set(t.id, { button, panel, dot });
+        }
+
+        // Arrow keys move between tabs (WAI-ARIA tabs pattern).
+        bar.addEventListener('keydown', (ev) => {
+            const ids = SETTINGS_TABS.map((t) => t.id);
+            const index = ids.indexOf(settingsUI.activeTab);
+            let next = null;
+            if (ev.key === 'ArrowRight') next = ids[(index + 1) % ids.length];
+            else if (ev.key === 'ArrowLeft') next = ids[(index - 1 + ids.length) % ids.length];
+            else if (ev.key === 'Home') next = ids[0];
+            else if (ev.key === 'End') next = ids[ids.length - 1];
+            if (!next) return;
+            ev.preventDefault();
+            selectSettingsTab(next, true);
+        });
+
+        return { bar, panels };
+    }
+
+    function make(tag, className, props) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (props) Object.assign(node, props);
+        return node;
+    }
+
+    function buildSettingsRow(item) {
+        const id = 'afx-s-' + item.key;
+        const row = make('label', 'afx-s-row');
+        row.htmlFor = id;
+
+        const textBox = make('span', 'afx-s-text');
+        const label = make('span', 'afx-s-label', { textContent: item.label });
+        if (item.reload === 'always') {
+            label.appendChild(make('span', 'afx-s-badge', { textContent: 'RELOAD', title: 'Changes apply after a reload' }));
+        }
+        textBox.appendChild(label);
+        if (item.hint) textBox.appendChild(make('span', 'afx-s-hint', { textContent: item.hint }));
+        row.appendChild(textBox);
+
+        let input;
+        if (item.type === 'number') {
+            const wrap = make('span', 'afx-s-num');
+            const scale = item.scale || 1;
+            input = make('input', '', { type: 'number', id, min: item.min, max: item.max, step: item.step });
+            input.addEventListener('change', () => {
+                let value = parseFloat(input.value);
+                if (!isFinite(value)) value = DEFAULTS[item.key] / scale;
+                value = Math.min(item.max, Math.max(item.min, value));
+                setSetting(item.key, Math.round(value * scale));
+                input.value = String(CFG[item.key] / scale);
+            });
+            wrap.appendChild(input);
+            if (item.unit) wrap.appendChild(make('span', '', { textContent: item.unit }));
+            row.appendChild(wrap);
+        } else {
+            input = make('input', 'afx-s-switch', { type: 'checkbox', id });
+            input.setAttribute('role', 'switch');
+            input.addEventListener('change', () => setSetting(item.key, input.checked));
+            row.appendChild(input);
+        }
+
+        settingsUI.rows.set(item.key, { el: row, input });
+        return row;
+    }
+
+    function buildSettingsMenu() {
+        settingsUI.rows.clear();
+        settingsUI.tabs.clear();
+
+        const root = make('div');
+        root.id = AFX.settingsId;
+        root.setAttribute(AFX.ui, '1');
+        root.dataset.open = '0';
+
+        const tab = make('button', 'afx-s-tab', { type: 'button', title: 'Focus Mode settings', innerHTML: GEAR_ICON });
+        tab.setAttribute('aria-label', 'Focus Mode settings');
+        tab.setAttribute('aria-controls', AFX.settingsId + '-drawer');
+        tab.setAttribute('aria-expanded', 'false');
+        tab.addEventListener('click', () => setSettingsOpen(root.dataset.open !== '1'));
+
+        const drawer = make('div', 'afx-s-drawer');
+        drawer.id = AFX.settingsId + '-drawer';
+        drawer.setAttribute('role', 'region');
+        drawer.setAttribute('aria-label', 'Focus Mode settings');
+        drawer.inert = true;
+
+        const head = make('div', 'afx-s-head');
+        const titles = make('div');
+        titles.appendChild(make('div', 'afx-s-title', { textContent: 'Focus Mode' }));
+        titles.appendChild(make('div', 'afx-s-sub', { textContent: 'Settings \u00b7 v' + VERSION }));
+        const closeBtn = make('button', 'afx-s-icon-btn', { type: 'button', title: 'Close', innerHTML: CLOSE_ICON });
+        closeBtn.setAttribute('aria-label', 'Close settings');
+        closeBtn.addEventListener('click', () => setSettingsOpen(false, true));
+        head.append(titles, closeBtn);
+
+        const tabs = buildSettingsTabs();
+        const body = make('div', 'afx-s-body');
+        body.append(...tabs.panels);
+
+        const reloadBar = make('div', 'afx-s-reload', { hidden: true });
+        reloadBar.appendChild(make('span', '', { textContent: 'Some changes apply after a reload.' }));
+        const reloadBtn = make('button', 'afx-s-btn afx-s-btn-primary', { type: 'button', textContent: 'Reload' });
+        reloadBtn.addEventListener('click', () => {
+            try { sessionStorage.setItem(SETTINGS_OPEN_KEY, '1'); } catch (_e) {}
+            location.reload();
+        });
+        reloadBar.appendChild(reloadBtn);
+
+        const foot = make('div', 'afx-s-foot');
+        foot.appendChild(make('span', '', { textContent: 'Saved automatically' }));
+        const resetBtn = make('button', 'afx-s-btn', { type: 'button', textContent: 'Reset to defaults' });
+        resetBtn.addEventListener('click', resetSettings);
+        foot.appendChild(resetBtn);
+
+        drawer.append(head, tabs.bar, body, reloadBar, foot);
+        root.append(tab, drawer);
+
+        root.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Escape' && root.dataset.open === '1') {
+                ev.stopPropagation();
+                setSettingsOpen(false, true);
+            }
+        });
+
+        Object.assign(settingsUI, { root, tab, drawer, body, closeBtn, reloadBar });
+        let savedTab = null;
+        try { savedTab = localStorage.getItem(SETTINGS_TAB_KEY); } catch (_e) {}
+        selectSettingsTab(savedTab);
+        refreshSettingsUI();
+        return root;
+    }
+
+    function setSettingsOpen(open, returnFocus, tabId) {
+        const root = settingsUI.root || (ensureSettingsMenu(), settingsUI.root);
+        if (!root) return;
+        if (open && tabId) selectSettingsTab(tabId);
+        root.dataset.open = open ? '1' : '0';
+        settingsUI.tab.setAttribute('aria-expanded', String(open));
+        if (open) {
+            refreshSettingsUI();
+            settingsUI.drawer.inert = false;
+            settingsUI.closeBtn.focus({ preventScroll: true });
+        } else {
+            if (returnFocus || settingsUI.drawer.contains(document.activeElement)) {
+                settingsUI.tab.focus({ preventScroll: true });
+            }
+            // Off-screen drawer stays out of the tab order and the a11y tree.
+            settingsUI.drawer.inert = true;
+        }
+    }
+
+    function ensureSettingsMenu() {
+        if (!document.body) return;
+        if (!settingsUI.root) {
+            document.body.appendChild(buildSettingsMenu());
+            let reopen = false;
+            try {
+                reopen = sessionStorage.getItem(SETTINGS_OPEN_KEY) === '1';
+                sessionStorage.removeItem(SETTINGS_OPEN_KEY);
+            } catch (_e) {}
+            if (reopen) setSettingsOpen(true);
+            return;
+        }
+        // React may wipe body children on a route change; put it back.
+        if (!settingsUI.root.isConnected) document.body.appendChild(settingsUI.root);
+    }
+
+    // ════════════════════════════════════════════════════════════════
     // SCAN + BOOT
     // ════════════════════════════════════════════════════════════════
 
@@ -1980,12 +2774,13 @@ clone.outerHTML + '\n' +
         ensureTopBarPinned();
         ensureDiffViewerWide();
         if (CFG.showExportButton) ensureExportButton();
+        ensureSettingsMenu();
         scheduleFollow();
     }
 
     function boot() {
         injectCSS();
-        if (CFG.preventZoom) installZoomLock();
+        installZoomLock();
         installFollowListeners();
 
         scan();
@@ -1996,11 +2791,11 @@ clone.outerHTML + '\n' +
             if (document.visibilityState === 'visible') scan();
         });
 
-        if (CFG.optimizeDOM) {
-            installOptimizer();
-            setTimeout(optimizeSweep, 500);
-            setTimeout(optimizeSweep, 2000);
-        }
+        // Installed regardless: optimizeSweep() checks CFG.optimizeDOM, so
+        // the settings menu can switch it on later.
+        installOptimizer();
+        setTimeout(optimizeSweep, 500);
+        setTimeout(optimizeSweep, 2000);
         log('booted');
     }
 
@@ -2019,6 +2814,13 @@ clone.outerHTML + '\n' +
         /** Print what the diff/workspace panel detection sees. */
         debugDiff: debugDiffPanel,
         config: CFG,
+        /** Open / close the settings drawer. */
+        /** Optionally jump to a tab: 'features', 'interface', 'performance', 'advanced'. */
+        openSettings: (tab) => setSettingsOpen(true, false, tab),
+        closeSettings: () => setSettingsOpen(false),
+        /** Change a setting from code: arenaFocus.set('autoScroll', false). */
+        set: (key, value) => setSetting(key, value),
+        resetSettings: () => resetSettings(),
         _internals: {
             findComposer, findComposerBar, ensureComposerPinned, composer,
             findTopBar, ensureTopBarPinned, widenComposer, topbar,
