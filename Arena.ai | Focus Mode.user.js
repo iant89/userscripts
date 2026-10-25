@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Arena.ai | Focus Mode
 // @namespace    https://arena.ai/
-// @version      1.3.0
+// @version      1.3.1
 // @author       Piknockyou (vibe-coded)
 // @license      AGPL-3.0
 // @description  Keeps an Arena conversation flowing: sticky auto-scroll that pauses the moment you interact and resumes when you click Arena's scroll-down arrow, locked zoom, a navbar pinned to the top, a composer pinned to the bottom and widened to fit the viewport, the diff viewer widened to fit it too, a flattened/optimized DOM, and one-click HTML export of the whole conversation (theme + layout preserved, folding still works).
@@ -14,7 +14,7 @@
 // ==/UserScript==
 
 /* ══════════════════════════════════════════════════════════════════
- * Arena.ai | Focus Mode — v1.3.0
+ * Arena.ai | Focus Mode — v1.3.1
  * ══════════════════════════════════════════════════════════════════
  *
  * A deliberately small script with four jobs:
@@ -696,11 +696,25 @@
 
     const composer = { el: null, bar: null, pinned: false, lastCheck: 0 };
 
+    // Text fields that belong to a code editor or the workspace/diff panel,
+    // never to the composer (CodeMirror's role="textbox", Monaco's textarea).
+    const EDITOR_FIELD_HINTS =
+        '.cm-editor, .monaco-editor, .CodeMirror, [class*="monaco" i], [class*="codemirror" i]';
+
+    function isComposerField(el) {
+        if (el.matches('[readonly], [aria-readonly="true"], [aria-hidden="true"]')) return false;
+        if (el.closest(EDITOR_FIELD_HINTS)) return false;
+        if (diffview.el && diffview.el.contains(el)) return false;
+        if (el.closest('[data-afx-diff="1"]')) return false;
+        return true;
+    }
+
     function findComposer() {
         const candidates = [];
         const nodes = $$('[role="textbox"], textarea, [contenteditable="true"], [role="composer"]');
         for (const el of nodes) {
             if (isOurs(el) || !isVisible(el)) continue;
+            if (!isComposerField(el)) continue;
             const r = el.getBoundingClientRect();
             if (r.width < 80 || r.height < 16) continue;
             candidates.push({ el, bottom: r.bottom });
@@ -1128,11 +1142,27 @@
         return true; // no explicit state: fall back to visibility checks
     }
 
+    /**
+     * Whether an element is, sits inside, or wraps the composer. The composer
+     * is often a tall floating bar (especially once pinned), so without this
+     * the generic panel/dialog fallback can grab its text field.
+     */
+    function touchesComposer(el) {
+        if (el.closest('[data-afx-composer="1"], [data-afx-pinned="1"]')) return true;
+        if (el.querySelector('[data-afx-composer="1"], [data-afx-pinned="1"]')) return true;
+        if (el.matches('textarea, input, [role="textbox"], [contenteditable="true"]')) return true;
+        for (const part of [composer.el, composer.bar]) {
+            if (!part || !part.isConnected) continue;
+            if (part === el || part.contains(el) || el.contains(part)) return true;
+        }
+        return false;
+    }
+
     function isPanelCandidate(el, vw) {
         if (!isElement(el) || isOurs(el)) return false;
         if (el.closest('[role="log"]')) return false;
         if (el.querySelector('[role="log"]')) return false;
-        if (el.closest('[data-afx-composer="1"]')) return false;
+        if (touchesComposer(el)) return false;
         if (el.id === AFX.exportBtnId) return false;
         if (!isVisible(el)) return false;
         const rect = el.getBoundingClientRect();
