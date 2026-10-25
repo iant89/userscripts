@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Arena.ai | Focus Mode
 // @namespace    https://arena.ai/
-// @version      1.4.0
+// @version      1.5.0
 // @author       Piknockyou (vibe-coded)
 // @license      AGPL-3.0
 // @description  Keeps an Arena conversation flowing: sticky auto-scroll that pauses the moment you interact and resumes when you click Arena's scroll-down arrow, locked zoom, a navbar pinned to the top, a composer pinned to the bottom and widened to fit the viewport, the diff viewer widened to fit it too, a flattened/optimized DOM, one-click HTML export of the whole conversation (theme + layout preserved, folding still works), and a slide-out settings menu.
@@ -14,7 +14,7 @@
 // ==/UserScript==
 
 /* ══════════════════════════════════════════════════════════════════
- * Arena.ai | Focus Mode — v1.4.0
+ * Arena.ai | Focus Mode — v1.5.0
  * ══════════════════════════════════════════════════════════════════
  *
  * A deliberately small script with five jobs:
@@ -49,7 +49,8 @@
  *                native <details>) working in the exported file.
  *
  *   5. SETTINGS  A small gear tab on the right edge of the viewport
- *                expands into a drawer with every option below. Changes
+ *                expands into a drawer with every option, grouped into
+ *                Features / Interface / Performance / Advanced tabs. Changes
  *                are saved to localStorage and most apply immediately;
  *                the drawer says when one needs a reload.
  *
@@ -106,7 +107,7 @@
     };
 
     const MARKER = '/* Arena.ai | Focus Mode */';
-    const VERSION = '1.4.0';
+    const VERSION = '1.5.0';
 
     const AFX = {
         styleId: 'afx-style',
@@ -2076,75 +2077,130 @@ clone.outerHTML + '\n' +
     // live; the few that undo layout work done earlier on the page (or that
     // set up timers at boot) ask for a reload instead of half-applying.
 
+    // The drawer is split into tabs, each holding one or more sections.
     // reload: 'off'    → switching it on applies live, switching it off needs a reload
     // reload: 'always' → any change needs a reload
     // requires         → greyed out while that other setting is off
-    const SETTINGS_SCHEMA = [
+    const SETTINGS_TABS = [
         {
-            title: 'Follow',
-            items: [
-                { key: 'autoScroll', label: 'Auto-scroll while streaming',
-                    hint: 'Stays on the newest message until you scroll up, select text or press PageUp/Home.' },
-                { key: 'resumeOnArrow', label: 'Resume on the scroll-down arrow', requires: 'autoScroll',
-                    hint: "Clicking Arena's round arrow above the composer turns following back on." },
-                { key: 'followThreshold', label: 'Bottom threshold', type: 'number', unit: 'px',
-                    min: 0, max: 2000, step: 10, requires: 'autoScroll',
-                    hint: 'How close to the bottom still counts as "at the bottom".' },
+            id: 'features',
+            label: 'Features',
+            sections: [
+                {
+                    title: 'Auto-scroll',
+                    items: [
+                        { key: 'autoScroll', label: 'Auto-scroll while streaming',
+                            hint: 'Stays on the newest message until you scroll up, select text or press PageUp/Home.' },
+                        { key: 'resumeOnArrow', label: 'Resume on the scroll-down arrow', requires: 'autoScroll',
+                            hint: "Clicking Arena's round arrow above the composer turns following back on." },
+                        { key: 'followThreshold', label: 'Bottom threshold', type: 'number', unit: 'px',
+                            min: 0, max: 2000, step: 10, requires: 'autoScroll',
+                            hint: 'How close to the bottom still counts as "at the bottom".' },
+                    ],
+                },
+                {
+                    title: 'Zoom',
+                    items: [
+                        { key: 'preventZoom', label: 'Lock page zoom',
+                            hint: 'Blocks Ctrl/⌘ + wheel, Ctrl/⌘ +/−/0 and pinch zoom.' },
+                    ],
+                },
+                {
+                    title: 'HTML export',
+                    items: [
+                        { key: 'exportMaxCSSBytes', label: 'Stylesheet size limit', type: 'number', unit: 'MB',
+                            scale: 1024 * 1024, min: 0.5, max: 64, step: 0.5,
+                            hint: 'How much of Arena\'s CSS is copied into an exported file.' },
+                    ],
+                },
             ],
         },
         {
-            title: 'Zoom',
-            items: [
-                { key: 'preventZoom', label: 'Lock page zoom',
-                    hint: 'Blocks Ctrl/\u2318 + wheel, Ctrl/\u2318 +/\u2212/0 and pinch zoom.' },
+            id: 'interface',
+            label: 'Interface',
+            sections: [
+                {
+                    title: 'Composer',
+                    items: [
+                        { key: 'pinComposer', label: 'Pin composer to the bottom', reload: 'off' },
+                        { key: 'wideComposer', label: 'Full-width composer', reload: 'off' },
+                    ],
+                },
+                {
+                    title: 'Navbar',
+                    items: [
+                        { key: 'pinTopNav', label: 'Pin navbar to the top', reload: 'off' },
+                        { key: 'showExportButton', label: 'Show export button',
+                            hint: 'Download icon next to the diff-browser control.' },
+                    ],
+                },
+                {
+                    title: 'Diff viewer',
+                    items: [
+                        { key: 'wideDiffViewer', label: 'Full-width diff viewer', reload: 'off' },
+                    ],
+                },
             ],
         },
         {
-            title: 'Layout',
-            items: [
-                { key: 'pinComposer', label: 'Pin composer to the bottom', reload: 'off' },
-                { key: 'wideComposer', label: 'Full-width composer', reload: 'off' },
-                { key: 'pinTopNav', label: 'Pin navbar to the top', reload: 'off' },
-                { key: 'wideDiffViewer', label: 'Full-width diff viewer', reload: 'off' },
+            id: 'performance',
+            label: 'Performance',
+            sections: [
+                {
+                    title: 'Message optimiser',
+                    items: [
+                        { key: 'optimizeDOM', label: 'Optimise idle messages', reload: 'off',
+                            hint: 'Master switch for everything else on this tab.' },
+                        { key: 'flattenCode', label: 'Flatten highlighted code blocks', requires: 'optimizeDOM', reload: 'off',
+                            hint: 'Turns syntax-highlighted code into plain text once a message is idle.' },
+                        { key: 'unwrapEmptySpans', label: 'Unwrap empty inline wrappers', requires: 'optimizeDOM', reload: 'off' },
+                        { key: 'contentVisibility', label: 'Skip rendering off-screen messages', requires: 'optimizeDOM', reload: 'off' },
+                        { key: 'idleBeforeOptimize', label: 'Idle time before optimising', type: 'number', unit: 's',
+                            scale: 1000, min: 0.5, max: 60, step: 0.5, requires: 'optimizeDOM' },
+                    ],
+                },
+                {
+                    title: 'Effects',
+                    items: [
+                        { key: 'killTransitions', label: 'Disable animations', requires: 'optimizeDOM' },
+                        { key: 'killBlurs', label: 'Disable backdrop blur', requires: 'optimizeDOM' },
+                    ],
+                },
             ],
         },
         {
-            title: 'Performance',
-            items: [
-                { key: 'optimizeDOM', label: 'Optimise idle messages', reload: 'off',
-                    hint: 'Master switch for everything in this section.' },
-                { key: 'killTransitions', label: 'Disable animations', requires: 'optimizeDOM' },
-                { key: 'killBlurs', label: 'Disable backdrop blur', requires: 'optimizeDOM' },
-                { key: 'flattenCode', label: 'Flatten highlighted code blocks', requires: 'optimizeDOM', reload: 'off',
-                    hint: 'Turns syntax-highlighted code into plain text once a message is idle.' },
-                { key: 'unwrapEmptySpans', label: 'Unwrap empty inline wrappers', requires: 'optimizeDOM', reload: 'off' },
-                { key: 'contentVisibility', label: 'Skip rendering off-screen messages', requires: 'optimizeDOM', reload: 'off' },
-                { key: 'idleBeforeOptimize', label: 'Idle time before optimising', type: 'number', unit: 's',
-                    scale: 1000, min: 0.5, max: 60, step: 0.5, requires: 'optimizeDOM' },
-            ],
-        },
-        {
-            title: 'Export',
-            items: [
-                { key: 'showExportButton', label: 'Show export button in the navbar' },
-                { key: 'exportMaxCSSBytes', label: 'Stylesheet size limit', type: 'number', unit: 'MB',
-                    scale: 1024 * 1024, min: 0.5, max: 64, step: 0.5,
-                    hint: 'How much of Arena\'s CSS is copied into an exported file.' },
-            ],
-        },
-        {
-            title: 'Advanced',
-            items: [
-                { key: 'idleFollowPoll', label: 'Follow safety poll', type: 'number', unit: 'ms',
-                    min: 200, max: 10000, step: 50, reload: 'always' },
-                { key: 'sweepInterval', label: 'Optimiser sweep interval', type: 'number', unit: 'ms',
-                    min: 500, max: 60000, step: 500, reload: 'always' },
-                { key: 'verbose', label: 'Verbose console logging' },
+            id: 'advanced',
+            label: 'Advanced',
+            sections: [
+                {
+                    title: 'Timers',
+                    items: [
+                        { key: 'idleFollowPoll', label: 'Follow safety poll', type: 'number', unit: 'ms',
+                            min: 200, max: 10000, step: 50, reload: 'always' },
+                        { key: 'sweepInterval', label: 'Optimiser sweep interval', type: 'number', unit: 'ms',
+                            min: 500, max: 60000, step: 500, reload: 'always' },
+                    ],
+                },
+                {
+                    title: 'Diagnostics',
+                    items: [
+                        { key: 'verbose', label: 'Verbose console logging' },
+                    ],
+                },
             ],
         },
     ];
 
+    /** Every setting item across all tabs and sections. */
+    function settingsItems(tab) {
+        const tabs = tab ? [tab] : SETTINGS_TABS;
+        const items = [];
+        for (const t of tabs) for (const section of t.sections) items.push(...section.items);
+        return items;
+    }
+
     const SETTINGS_OPEN_KEY = 'afx-focus-mode-settings-open';
+    const SETTINGS_TAB_KEY = 'afx-focus-mode-settings-tab';
 
     const GEAR_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
         'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
@@ -2154,7 +2210,12 @@ clone.outerHTML + '\n' +
     const CLOSE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
         'stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
 
-    const settingsUI = { root: null, tab: null, drawer: null, closeBtn: null, reloadBar: null, rows: new Map() };
+    const settingsUI = {
+        root: null, tab: null, drawer: null, body: null, closeBtn: null, reloadBar: null,
+        rows: new Map(),
+        tabs: new Map(),   // tab id -> { button, panel, dot }
+        activeTab: null,
+    };
 
     function buildSettingsCSS() {
         const root = '#' + AFX.settingsId;
@@ -2254,6 +2315,46 @@ clone.outerHTML + '\n' +
             ${root} .afx-s-icon-btn:hover { background: var(--afx-hover); color: var(--afx-fg); }
             ${root} .afx-s-icon-btn:focus-visible { outline: 2px solid var(--afx-accent); }
             ${root} .afx-s-icon-btn svg { width: 16px; height: 16px; }
+
+            ${root} .afx-s-tabs {
+                display: flex;
+                gap: 2px;
+                padding: 8px 12px 0;
+                border-bottom: 1px solid var(--afx-border);
+            }
+            ${root} .afx-s-tabbtn {
+                position: relative;
+                flex: 1 1 auto;
+                min-width: 0;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 5px;
+                margin: 0 0 -1px;
+                padding: 8px 6px 9px;
+                border: 0;
+                border-bottom: 2px solid transparent;
+                border-radius: 6px 6px 0 0;
+                background: transparent;
+                color: var(--afx-muted);
+                font: inherit;
+                font-size: 12px;
+                font-weight: 500;
+                white-space: nowrap;
+                cursor: pointer;
+            }
+            ${root} .afx-s-tabbtn > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+            ${root} .afx-s-tabbtn:hover { color: var(--afx-fg); background: var(--afx-hover); }
+            ${root} .afx-s-tabbtn[aria-selected="true"] { color: var(--afx-fg); border-bottom-color: var(--afx-accent); }
+            ${root} .afx-s-tabbtn:focus-visible { outline: 2px solid var(--afx-accent); outline-offset: -2px; }
+            ${root} .afx-s-dot {
+                flex: 0 0 auto;
+                width: 6px; height: 6px;
+                border-radius: 50%;
+                background: var(--afx-accent);
+            }
+            ${root} .afx-s-dot[hidden] { display: none; }
+            ${root} .afx-s-panel[hidden] { display: none; }
 
             ${root} .afx-s-body { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: 4px 0 12px; }
             ${root} .afx-s-section { padding: 10px 16px 4px; }
@@ -2374,19 +2475,14 @@ clone.outerHTML + '\n' +
     }
 
     function schemaItem(key) {
-        for (const section of SETTINGS_SCHEMA) {
-            for (const item of section.items) if (item.key === key) return item;
-        }
-        return null;
+        return settingsItems().find((item) => item.key === key) || null;
     }
 
     function needsReload() {
-        for (const section of SETTINGS_SCHEMA) {
-            for (const item of section.items) {
-                if (!item.reload || CFG[item.key] === BOOT_CFG[item.key]) continue;
-                if (item.reload === 'always') return true;
-                if (item.reload === 'off' && BOOT_CFG[item.key] === true && CFG[item.key] === false) return true;
-            }
+        for (const item of settingsItems()) {
+            if (!item.reload || CFG[item.key] === BOOT_CFG[item.key]) continue;
+            if (item.reload === 'always') return true;
+            if (item.reload === 'off' && BOOT_CFG[item.key] === true && CFG[item.key] === false) return true;
         }
         return false;
     }
@@ -2444,7 +2540,79 @@ clone.outerHTML + '\n' +
                 row.input.setAttribute('aria-checked', String(!!CFG[key]));
             }
         }
+        // A dot on a tab marks that something on it differs from the defaults.
+        for (const t of SETTINGS_TABS) {
+            const entry = settingsUI.tabs.get(t.id);
+            if (!entry) continue;
+            const changed = settingsItems(t).some((item) => CFG[item.key] !== DEFAULTS[item.key]);
+            entry.dot.hidden = !changed;
+        }
         settingsUI.reloadBar.hidden = !needsReload();
+    }
+
+    function selectSettingsTab(id, focus) {
+        const entry = settingsUI.tabs.get(id) || settingsUI.tabs.get(SETTINGS_TABS[0].id);
+        if (!entry) return;
+        for (const [tabId, other] of settingsUI.tabs) {
+            const active = other === entry;
+            other.button.setAttribute('aria-selected', String(active));
+            other.button.tabIndex = active ? 0 : -1;
+            other.panel.hidden = !active;
+            if (active) settingsUI.activeTab = tabId;
+        }
+        settingsUI.body.scrollTop = 0;
+        if (focus) entry.button.focus({ preventScroll: true });
+        try { localStorage.setItem(SETTINGS_TAB_KEY, settingsUI.activeTab); } catch (_e) {}
+    }
+
+    function buildSettingsTabs() {
+        const bar = make('div', 'afx-s-tabs');
+        bar.setAttribute('role', 'tablist');
+        bar.setAttribute('aria-label', 'Settings categories');
+
+        const panels = [];
+        for (const t of SETTINGS_TABS) {
+            const tabId = AFX.settingsId + '-tab-' + t.id;
+            const panelId = AFX.settingsId + '-panel-' + t.id;
+
+            const button = make('button', 'afx-s-tabbtn', { type: 'button', id: tabId });
+            button.setAttribute('role', 'tab');
+            button.setAttribute('aria-controls', panelId);
+            button.appendChild(make('span', '', { textContent: t.label }));
+            const dot = make('span', 'afx-s-dot', { hidden: true, title: 'Changed from the defaults' });
+            button.appendChild(dot);
+            button.addEventListener('click', () => selectSettingsTab(t.id));
+            bar.appendChild(button);
+
+            const panel = make('div', 'afx-s-panel', { id: panelId, hidden: true });
+            panel.setAttribute('role', 'tabpanel');
+            panel.setAttribute('aria-labelledby', tabId);
+            for (const section of t.sections) {
+                const box = make('section', 'afx-s-section');
+                box.appendChild(make('h3', 'afx-s-section-title', { textContent: section.title }));
+                section.items.forEach((item) => box.appendChild(buildSettingsRow(item)));
+                panel.appendChild(box);
+            }
+            panels.push(panel);
+
+            settingsUI.tabs.set(t.id, { button, panel, dot });
+        }
+
+        // Arrow keys move between tabs (WAI-ARIA tabs pattern).
+        bar.addEventListener('keydown', (ev) => {
+            const ids = SETTINGS_TABS.map((t) => t.id);
+            const index = ids.indexOf(settingsUI.activeTab);
+            let next = null;
+            if (ev.key === 'ArrowRight') next = ids[(index + 1) % ids.length];
+            else if (ev.key === 'ArrowLeft') next = ids[(index - 1 + ids.length) % ids.length];
+            else if (ev.key === 'Home') next = ids[0];
+            else if (ev.key === 'End') next = ids[ids.length - 1];
+            if (!next) return;
+            ev.preventDefault();
+            selectSettingsTab(next, true);
+        });
+
+        return { bar, panels };
     }
 
     function make(tag, className, props) {
@@ -2496,6 +2664,7 @@ clone.outerHTML + '\n' +
 
     function buildSettingsMenu() {
         settingsUI.rows.clear();
+        settingsUI.tabs.clear();
 
         const root = make('div');
         root.id = AFX.settingsId;
@@ -2523,13 +2692,9 @@ clone.outerHTML + '\n' +
         closeBtn.addEventListener('click', () => setSettingsOpen(false, true));
         head.append(titles, closeBtn);
 
+        const tabs = buildSettingsTabs();
         const body = make('div', 'afx-s-body');
-        for (const section of SETTINGS_SCHEMA) {
-            const box = make('section', 'afx-s-section');
-            box.appendChild(make('h3', 'afx-s-section-title', { textContent: section.title }));
-            section.items.forEach((item) => box.appendChild(buildSettingsRow(item)));
-            body.appendChild(box);
-        }
+        body.append(...tabs.panels);
 
         const reloadBar = make('div', 'afx-s-reload', { hidden: true });
         reloadBar.appendChild(make('span', '', { textContent: 'Some changes apply after a reload.' }));
@@ -2546,7 +2711,7 @@ clone.outerHTML + '\n' +
         resetBtn.addEventListener('click', resetSettings);
         foot.appendChild(resetBtn);
 
-        drawer.append(head, body, reloadBar, foot);
+        drawer.append(head, tabs.bar, body, reloadBar, foot);
         root.append(tab, drawer);
 
         root.addEventListener('keydown', (ev) => {
@@ -2556,14 +2721,18 @@ clone.outerHTML + '\n' +
             }
         });
 
-        Object.assign(settingsUI, { root, tab, drawer, closeBtn, reloadBar });
+        Object.assign(settingsUI, { root, tab, drawer, body, closeBtn, reloadBar });
+        let savedTab = null;
+        try { savedTab = localStorage.getItem(SETTINGS_TAB_KEY); } catch (_e) {}
+        selectSettingsTab(savedTab);
         refreshSettingsUI();
         return root;
     }
 
-    function setSettingsOpen(open, returnFocus) {
+    function setSettingsOpen(open, returnFocus, tabId) {
         const root = settingsUI.root || (ensureSettingsMenu(), settingsUI.root);
         if (!root) return;
+        if (open && tabId) selectSettingsTab(tabId);
         root.dataset.open = open ? '1' : '0';
         settingsUI.tab.setAttribute('aria-expanded', String(open));
         if (open) {
@@ -2646,7 +2815,8 @@ clone.outerHTML + '\n' +
         debugDiff: debugDiffPanel,
         config: CFG,
         /** Open / close the settings drawer. */
-        openSettings: () => setSettingsOpen(true),
+        /** Optionally jump to a tab: 'features', 'interface', 'performance', 'advanced'. */
+        openSettings: (tab) => setSettingsOpen(true, false, tab),
         closeSettings: () => setSettingsOpen(false),
         /** Change a setting from code: arenaFocus.set('autoScroll', false). */
         set: (key, value) => setSetting(key, value),
