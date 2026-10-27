@@ -1,0 +1,12 @@
+{
+  "name": "web-inspector-tests",
+  "private": true,
+  "scripts": {
+    "test": "node scripts/update-icons.cjs --check && node --test tests/*.test.cjs",
+    "update:icons": "node scripts/update-icons.cjs"
+  },
+  "devDependencies": {
+    "@fortawesome/free-solid-svg-icons": "7.3.1",
+    "playwright": "1.64.1"
+  }
+}
