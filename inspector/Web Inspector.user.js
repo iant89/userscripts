@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Inspector
 // @namespace    https://github.com/iant89/userscripts
-// @version      0.4.2
+// @version      0.4.3
 // @description  A mobile-friendly, self-contained web inspector for the current page.
 // @match        *://*/*
 // @run-at       document-start
@@ -394,7 +394,7 @@
     const statusText = root.querySelector('#status-text');
     const originalConsole = {};
     const stateLocal = {
-      selected: null, selectedNodeRow: null, expanded: new WeakSet(), elementSearch: '',
+      selected: null, selectedNodeRow: null, expanded: new WeakSet(), elementSearch: '', sourceSearch: '', sourceFindFrom: 0,
       filteredNodes: null, sourceText: '', sourceOverride: null, consoleEntries: [], commandHistory: [], historyIndex: 0,
       resourceType: state.lastResourceType || 'local', resourceEntries: [], resourceSelected: null,
       removed: null, hidden: new WeakMap(), picking: false, pickOverlay: null, pickPoint: null,
@@ -488,6 +488,9 @@
       else if (tab === 'console') toolbar.innerHTML = `<span class="muted">Execution target: ${executionTarget === 'page' ? 'current page' : 'userscript context (page globals unavailable)'}</span><span class="spacer"></span><button data-action="clear-console" title="Clear console output" aria-label="Clear console output">Clear</button><button data-action="clear-history" title="Clear command history" aria-label="Clear command history">History</button>`;
       else if (tab === 'source') toolbar.innerHTML = `<span class="muted">Read-only representation</span><span class="spacer"></span><input class="field small" id="source-search" style="width:min(180px,45vw)" placeholder="Find in source" aria-label="Find in source"><button data-action="source-find" title="Find in source" aria-label="Find in source">${faIcon('search')}</button><button data-action="copy-source" title="Copy source" aria-label="Copy source">${faIcon('copy')} Copy</button>`;
       else toolbar.innerHTML = `<span class="muted">Accessible page storage</span><span class="spacer"></span>`;
+      // Rebuilding the toolbar must not discard a query the user has typed.
+      const elementFilter = toolbar.querySelector('#element-filter'); if (elementFilter) elementFilter.value = stateLocal.elementSearch;
+      const sourceSearch = toolbar.querySelector('#source-search'); if (sourceSearch) sourceSearch.value = stateLocal.sourceSearch;
     }
     function excluded(el) { return el === host || el?.getRootNode?.() === root || el?.closest?.(`#${APP_ID}, [data-web-inspector-reopen]`) || el?.hasAttribute?.('data-web-inspector-host'); }
     function elementDescription(el) {
@@ -541,7 +544,15 @@
       stateLocal.selected = el;
       let p = el.parentElement;
       while (p && !excluded(p)) { stateLocal.expanded.add(p); p = p.parentElement; }
-      renderTree(); renderDetails(); updateSelectionHighlight(); ensureHighlightLoop();
+      renderTree(); revealSelectedRow(); renderDetails(); updateSelectionHighlight(); ensureHighlightLoop();
+    }
+    function revealSelectedRow() {
+      const row = tree.querySelector('.tree-row.selected');
+      if (!row || !tree.clientHeight) return;
+      const view = tree.getBoundingClientRect(), rect = row.getBoundingClientRect();
+      if (rect.top < view.top || rect.bottom > view.bottom) tree.scrollTop += rect.top - view.top - (tree.clientHeight - rect.height) / 2;
+      const tag = row.querySelector('.tag')?.getBoundingClientRect();
+      if (tag && (tag.left < view.left || tag.right > view.right)) tree.scrollLeft += tag.left - view.left - 30;
     }
     function htmlEscape(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
     function highlightHTML(text) {
@@ -582,8 +593,28 @@
         const value = prompt(`Value for ${key}`, '') ?? ''; el.setAttribute(key, value); renderDetails();
       }); attrs.appendChild(addAttr);
       const textLabel = document.createElement('div'); textLabel.className = 'label'; textLabel.textContent = 'Text content (explicitly apply)'; attrs.appendChild(textLabel);
-      const text = document.createElement('textarea'); text.className = 'field editor'; text.value = [...el.childNodes].filter(n => n.nodeType === Node.TEXT_NODE).map(n => n.nodeValue).join(''); text.setAttribute('aria-label', 'Direct text content'); attrs.appendChild(text);
-      const applyText = document.createElement('button'); applyText.textContent = 'Apply text content'; applyText.addEventListener('click', () => { if (!el.isConnected) return setStatus('Selected element was removed'); const existing = [...el.childNodes].filter(n => n.nodeType === Node.TEXT_NODE); if (existing.length) { existing[0].nodeValue = text.value; existing.slice(1).forEach(n => n.remove()); } else el.insertBefore(document.createTextNode(text.value), el.firstChild); renderTree(); renderDetails(); setStatus('Text updated'); }); attrs.appendChild(applyText);
+      // One editor per direct text node keeps each piece of text in its place
+      // between child elements. Whitespace-only formatting nodes are left alone.
+      const segments = [...el.childNodes].filter(n => n.nodeType === Node.TEXT_NODE && n.nodeValue.trim());
+      const editors = (segments.length ? segments : [null]).map((node, index) => {
+        if (segments.length > 1) {
+          const neighbour = node.previousElementSibling ? `after <${node.previousElementSibling.localName}>` : node.nextElementSibling ? `before <${node.nextElementSibling.localName}>` : '';
+          const sub = document.createElement('div'); sub.className = 'label'; sub.textContent = `Text ${index + 1} of ${segments.length}${neighbour ? ` (${neighbour})` : ''}`; attrs.appendChild(sub);
+        }
+        const text = document.createElement('textarea'); text.className = 'field editor'; text.value = node ? node.nodeValue : '';
+        text.setAttribute('aria-label', segments.length > 1 ? `Direct text content ${index + 1}` : 'Direct text content'); attrs.appendChild(text);
+        return { node, text };
+      });
+      const applyText = document.createElement('button'); applyText.textContent = 'Apply text content'; applyText.addEventListener('click', () => {
+        if (!el.isConnected) return setStatus('Selected element was removed');
+        let changed = false;
+        for (const { node, text } of editors) {
+          if (node) { if (!node.isConnected || node.parentNode !== el) return setStatus('Text changed on the page; refresh and try again'); if (node.nodeValue !== text.value) { node.nodeValue = text.value; changed = true; } }
+          else if (text.value) { el.insertBefore(document.createTextNode(text.value), el.firstChild); changed = true; }
+        }
+        if (!changed) return setStatus('Text unchanged');
+        renderTree(); renderDetails(); setStatus('Text updated');
+      }); attrs.appendChild(applyText);
       const htmlLabel = document.createElement('div'); htmlLabel.className = 'label'; htmlLabel.textContent = 'Current HTML (read-only preview)'; attrs.appendChild(htmlLabel);
       const pre = document.createElement('pre'); pre.className = 'htmlview'; pre.style.cssText = 'max-height:180px;flex:none'; pre.innerHTML = highlightHTML(el.outerHTML.slice(0, 12000) + (el.outerHTML.length > 12000 ? '\n… truncated' : '')); attrs.appendChild(pre);
       const copy = document.createElement('button'); copy.textContent = 'Copy HTML'; copy.addEventListener('click', () => copyText(el.outerHTML).then(() => setStatus('Element HTML copied'), () => setStatus('Clipboard access unavailable'))); attrs.appendChild(copy);
@@ -608,10 +639,11 @@
     function deleteElement() {
       const el = stateLocal.selected;
       if (!el?.isConnected || excluded(el)) return setStatus('This element cannot be removed');
+      if (el.contains(host) || el.contains(reopenButton)) return setStatus('Cannot remove an element that contains the inspector');
       if (['HTML', 'BODY'].includes(el.tagName) && !confirm(`Remove the document ${el.tagName.toLowerCase()} element? This may disrupt the page.`)) return;
       if (!confirm(`Remove <${el.localName}> from the page? You can Undo immediately.`)) return;
       const parent = el.parentNode; const next = el.nextSibling;
-      if (!parent || parent === host || parent.contains(host)) return setStatus('Cannot remove an inspector ancestor');
+      if (!parent) return setStatus('This element cannot be removed');
       stateLocal.removed = { el, parent, next }; el.remove(); stateLocal.selected = null; renderTree(); renderDetails(); setStatus('Element removed. Use Undo in the toolbar to restore it.');
       buildToolbar();
     }
@@ -637,10 +669,13 @@
         classes.forEach(c => { if (/^[\w-]+$/.test(c)) node.classList.add(c); });
         node.textContent = modal.querySelector('[data-f="text"]').value;
         const where = modal.querySelector('[data-f="where"]').value;
-        if (where === 'first') el.insertBefore(node, el.firstChild);
-        else if (where === 'before' && el.parentNode) el.parentNode.insertBefore(node, el);
-        else if (where === 'after' && el.parentNode) el.parentNode.insertBefore(node, el.nextSibling);
-        else el.appendChild(node);
+        if ((where === 'before' || where === 'after') && el.parentNode?.nodeType !== Node.ELEMENT_NODE) return alert(`An element cannot be inserted ${where} the <${el.localName}> element. Choose a child position instead.`);
+        try {
+          if (where === 'first') el.insertBefore(node, el.firstChild);
+          else if (where === 'before') el.parentNode.insertBefore(node, el);
+          else if (where === 'after') el.parentNode.insertBefore(node, el.nextSibling);
+          else el.appendChild(node);
+        } catch (e) { return alert(`Could not insert element: ${e.message}`); }
         modal.remove(); selectElement(node); setStatus('Element inserted as text-safe content');
       };
       modal.querySelector('[data-f="tag"]').focus();
@@ -815,11 +850,11 @@
       if (state.activeTab !== 'source') return;
       if (stateLocal.sourceOverride) {
         root.querySelector('#source-label').textContent = `Resource view: ${stateLocal.sourceOverride.name} (temporary)`;
-        sourceView.innerHTML = highlightCode(stateLocal.sourceOverride.value, stateLocal.sourceOverride.language);
+        sourceView.innerHTML = highlightCode(stateLocal.sourceOverride.value, stateLocal.sourceOverride.language); stateLocal.sourceFindFrom = 0;
         return;
       }
       root.querySelector('#source-label').textContent = 'Reconstructed live DOM · not original response';
-      stateLocal.sourceText = sourceHTML();
+      stateLocal.sourceText = sourceHTML(); stateLocal.sourceFindFrom = 0;
       sourceView.innerHTML = highlightHTML(stateLocal.sourceText);
     }
     function highlightCode(text, lang='text') {
@@ -868,7 +903,7 @@
       for (const entry of stateLocal.consoleEntries) {
         const row=document.createElement('div'); row.className=`entry ${entry.level==='warn'?'warn':entry.level==='error'?'error':entry.level==='debug'?'debug':''}`;
         const stamp=document.createElement('span'); stamp.className='stamp'; stamp.textContent=new Date(entry.time).toLocaleTimeString();
-        const kind=document.createElement('span'); kind.className='kind'; kind.textContent=entry.level.toUpperCase();
+        const kind=document.createElement('span'); kind.className='kind'; kind.textContent=entry.level==='command'?'>':entry.level.toUpperCase();
         const msg=document.createElement('span'); msg.textContent=entry.value;
         row.append(stamp,kind,msg); consoleLog.appendChild(row);
       }
@@ -877,8 +912,7 @@
     async function executeCommand() {
       const input=root.querySelector('#command'); const code=input.value.trim(); if(!code) return;
       stateLocal.commandHistory.push(code); stateLocal.historyIndex=stateLocal.commandHistory.length;
-      const group=document.createElement('div'); group.className='entry'; group.innerHTML=`<span class="kind">&gt;</span><span></span>`; group.querySelector('span:last-child').textContent=code; consoleLog.appendChild(group);
-      addConsoleEntry('debug',[`Executing in ${executionTarget} context: ${code}`]);
+      addConsoleEntry('command',[code]);
       input.value='';
       try {
         // Explicit user-triggered execution; inspector internals never run commands.
@@ -1017,12 +1051,29 @@
     function searchElements() {
       const q=(root.querySelector('#element-filter')?.value||'').trim().toLowerCase();
       searchResults=[];searchIndex=-1;if(!q){setStatus('Enter a search query');return;}
-      const walker=document.createTreeWalker(document.documentElement,NodeFilter.SHOW_ELEMENT,{acceptNode:n=>excluded(n)?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT});let n,count=0;
-      while((n=walker.nextNode())&&count<10000){const hay=`${n.tagName} ${n.id} ${n.className} ${[...n.attributes].map(a=>`${a.name}=${a.value}`).join(' ')} ${n.textContent?.slice(0,300)}`.toLowerCase();if(hay.includes(q))searchResults.push(n);count++;}
+      const rootEl=document.documentElement;if(!rootEl)return setStatus('Document is not available');
+      const walker=document.createTreeWalker(rootEl,NodeFilter.SHOW_ELEMENT,{acceptNode:n=>excluded(n)?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT});let n=rootEl,count=0;
+      // Match each element's own text only; otherwise every ancestor of a hit matches too.
+      const ownText=el=>[...el.childNodes].filter(c=>c.nodeType===Node.TEXT_NODE).map(c=>c.nodeValue).join('').slice(0,300);
+      do{const hay=`${n.localName} ${n.id} ${n.getAttribute('class')||''} ${[...n.attributes].map(a=>`${a.name}=${a.value}`).join(' ')} ${ownText(n)}`.toLowerCase();if(hay.includes(q))searchResults.push(n);count++;}while((n=walker.nextNode())&&count<10000);
       if(searchResults.length)stepSearch(1);else setStatus(`No matches for “${q}”`);
     }
     function stepSearch(dir){if(!searchResults.length)return;searchIndex=(searchIndex+dir+searchResults.length)%searchResults.length;const el=searchResults[searchIndex];selectElement(el);setStatus(`Search result ${searchIndex+1} of ${searchResults.length}`);}
-    function findSource(){const q=root.querySelector('#source-search')?.value;if(!q)return;const i=sourceView.textContent.toLowerCase().indexOf(q.toLowerCase());if(i<0)return setStatus('Text not found');const range=document.createRange();const walker=document.createTreeWalker(sourceView,NodeFilter.SHOW_TEXT);let node,offset=i,found=false;while((node=walker.nextNode())){if(offset<=node.length){range.setStart(node,offset);range.setEnd(node,Math.min(node.length,offset+q.length));found=true;break;}offset-=node.length;}if(found){const sel=getSelection();sel.removeAllRanges();sel.addRange(range);range.startContainer.parentElement?.scrollIntoView({block:'center'});}}
+    function findSource(){
+      const q=stateLocal.sourceSearch;if(!q)return;
+      const text=sourceView.textContent.toLowerCase(),needle=q.toLowerCase();
+      let i=text.indexOf(needle,stateLocal.sourceFindFrom);if(i<0&&stateLocal.sourceFindFrom>0)i=text.indexOf(needle);
+      if(i<0){stateLocal.sourceFindFrom=0;return setStatus('Text not found');}
+      stateLocal.sourceFindFrom=i+1;
+      let total=0,index=0;for(let at=text.indexOf(needle);at>=0;at=text.indexOf(needle,at+1)){total++;if(at<=i)index=total;}
+      const locate=(pos,isEnd)=>{const walker=document.createTreeWalker(sourceView,NodeFilter.SHOW_TEXT);let node,offset=pos;while((node=walker.nextNode())){if(isEnd?offset<=node.length:offset<node.length)return[node,offset];offset-=node.length;}return null;};
+      const start=locate(i,false),end=locate(i+needle.length,true);if(!start||!end)return;
+      const range=document.createRange();range.setStart(...start);range.setEnd(...end);
+      const sel=getSelection();sel.removeAllRanges();sel.addRange(range);
+      const rect=range.getBoundingClientRect(),view=sourceView.getBoundingClientRect();
+      sourceView.scrollTop+=rect.top-view.top-sourceView.clientHeight/2;sourceView.scrollLeft+=rect.left-view.left-30;
+      setStatus(`Match ${index} of ${total}`);
+    }
 
     function getDockAt(x,y) { const v=usableViewport();if(x-v.left<SNAP_DISTANCE)return 'left';if(v.left+v.w-x<SNAP_DISTANCE)return 'right';if(y-v.top<SNAP_DISTANCE)return 'top';if(v.top+v.h-y<SNAP_DISTANCE)return 'bottom';return null; }
     function dockRect(dock) {const v=usableViewport();if(dock==='left')return{x:v.left,y:v.top,w:Math.min(state.width,v.w*.5),h:v.h};if(dock==='right'){const w=Math.min(state.width,v.w*.5);return{x:v.left+v.w-w,y:v.top,w,h:v.h};}if(dock==='top')return{x:v.left,y:v.top,w:v.w,h:clamp(state.height,140,v.h*.72)};return{x:v.left,y:v.top+v.h-clamp(state.height,140,v.h*.72),w:v.w,h:clamp(state.height,140,v.h*.72)}; }
@@ -1088,8 +1139,9 @@
       root.querySelectorAll('[data-resize]').forEach(h=>{h.addEventListener('pointerdown',startResize);h.addEventListener('pointermove',moveResize);h.addEventListener('pointerup',endResize);h.addEventListener('pointercancel',endResize);});
       listen('#resource-filter','input',refreshResources);
       listen('#command','keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();executeCommand();}else if(e.key==='ArrowUp'&&e.target.selectionStart===0){e.preventDefault();stateLocal.historyIndex=Math.max(0,stateLocal.historyIndex-1);e.target.value=stateLocal.commandHistory[stateLocal.historyIndex]||'';}else if(e.key==='ArrowDown'&&e.target.selectionStart===e.target.value.length){e.preventDefault();stateLocal.historyIndex=Math.min(stateLocal.commandHistory.length,stateLocal.historyIndex+1);e.target.value=stateLocal.commandHistory[stateLocal.historyIndex]||'';}});
-      listen('#element-filter','keydown',e=>{if(e.key==='Enter'){searchElements();e.preventDefault();}});
-      listen('#source-search','keydown',e=>{if(e.key==='Enter')findSource();});
+      // The toolbar is rebuilt on every tab switch, so its inputs are handled by delegation.
+      listen(root,'keydown',e=>{if(e.key!=='Enter')return;const id=e.target?.id;if(id==='element-filter'){e.preventDefault();searchElements();}else if(id==='source-search'){e.preventDefault();findSource();}});
+      listen(root,'input',e=>{const id=e.target?.id;if(id==='element-filter')stateLocal.elementSearch=e.target.value;else if(id==='source-search'){stateLocal.sourceSearch=e.target.value;stateLocal.sourceFindFrom=0;}});
       listen(win,'pointerenter',()=>win.classList.remove('idle'));listen(win,'pointerleave',()=>{if(state.dock==='float'&&!stateLocal.drag&&!stateLocal.resize&&matchMedia('(hover: hover)').matches)win.classList.add('idle');});
       const resize=()=>{applyGeometry();if(!reopenButton.hidden)positionReopenButton();};listen(window,'resize',resize);if(window.visualViewport){listen(window.visualViewport,'resize',resize);listen(window.visualViewport,'scroll',resize);}
       listen(window,'keydown',e=>{if(e.key==='Escape'&&stateLocal.picking){e.preventDefault();e.stopImmediatePropagation();cancelPicker();return;}if((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key.toLowerCase()==='i'){e.preventDefault();if(stateLocal.picking)cancelPicker();setInspectorClosed(!state.closed);}},true);
