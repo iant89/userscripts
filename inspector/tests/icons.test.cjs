@@ -34,6 +34,7 @@ const definitions = {
   beautify: solid.faWandMagicSparkles,
   download: solid.faDownload,
   gear: solid.faGear,
+  locate: solid.faLocationDot,
 };
 let browser;
 
@@ -139,6 +140,7 @@ test('controls use labeled, decorative Font Awesome icons with official paths', 
     ['[data-action="delete-element"]', 'Delete selected element', 'trash'],
     ['[data-action="add-element"]', 'Add an element', 'plus'],
     ['[data-action="refresh-element"]', 'Refresh selected element', 'refresh'],
+    ['[data-action="locate-element"]', 'Locate selected element on the page', 'locate'],
     ['[data-action="execute"]', 'Execute command', 'play'],
     ['.sourcebar [data-action="copy-source"]', 'Copy source', 'copy'],
     ['[data-action="refresh-source"]', 'Refresh source', 'refresh'],

@@ -32,6 +32,7 @@ const icons = {
   beautify: 'faWandMagicSparkles',
   download: 'faDownload',
   gear: 'faGear',
+  locate: 'faLocationDot',
 };
 
 const scriptPath = path.join(__dirname, '..', 'Web Inspector.user.js');
