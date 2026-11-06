@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Inspector
 // @namespace    https://github.com/iant89/userscripts
-// @version      0.6.0
+// @version      0.7.0
 // @description  A mobile-friendly, self-contained web inspector for the current page.
 // @match        *://*/*
 // @run-at       document-start
@@ -341,7 +341,7 @@
       .wi.idle{opacity:.76}.wi.dragging,.wi.resizing{transition:none;opacity:1}.wi.closed{display:none}
       .title{height:44px;min-height:44px;display:flex;align-items:center;gap:8px;padding:0 8px 0 12px;background:linear-gradient(110deg,#26364b,#1c2634);border-bottom:1px solid var(--line);touch-action:none;user-select:none;cursor:grab}
       .title:active{cursor:grabbing}.brand{display:flex;align-items:center;gap:8px;min-width:0;flex:1}.logo{width:24px;height:24px;border-radius:7px;background:#388bd0;display:grid;place-items:center;font-weight:800;color:white}.titletext{font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.context{color:var(--muted);font-size:11px;margin-left:3px}
-      button{font:inherit;color:inherit;border:1px solid transparent;background:transparent;border-radius:7px;min-width:36px;height:34px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 8px}button:hover{background:#ffffff12;border-color:#ffffff14}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}.icon{font-size:16px;line-height:1}.title button{width:38px;height:38px;font-size:18px}.close:hover{background:#9f3942}.tabs{display:flex;gap:4px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow:auto;scrollbar-width:thin}.tab{white-space:nowrap;color:var(--muted);padding:5px 11px}.tab[aria-selected="true"]{color:var(--text);background:#2d4056;border-color:#47607c}.toolbar{display:flex;align-items:center;gap:4px;min-height:42px;padding:4px 8px;background:#141a23;border-bottom:1px solid var(--line);overflow:auto}.toolbar .spacer{flex:1}.toolbar button{min-width:36px}.content{position:relative;display:flex;flex:1;min-height:0;overflow:hidden}.panel{display:none;flex:1;min-height:0;min-width:0}.panel.active{display:flex}.columns{display:flex;flex:1;min-width:0;min-height:0}.treepane{width:42%;min-width:115px;border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}.detailpane{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}.subhead{padding:6px 9px;color:var(--muted);font-size:11px;letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}.tree,.scroll{overflow:auto;overscroll-behavior:contain;min-height:0;flex:1;padding:6px}.tree{display:grid;grid-template-columns:minmax(max-content,1fr);align-content:start}.tree-row{box-sizing:border-box;height:auto;min-height:25px;display:flex;align-items:center;gap:4px;padding:2px 5px;border-radius:5px;white-space:nowrap;cursor:pointer;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.tree-row:hover{background:#ffffff0a}.tree-row.selected{background:#23507a;color:#fff}.tree-row .twisty{width:18px;min-width:18px;height:22px;padding:0;color:var(--muted)}.tree-row .twisty,.tree-row .tag{flex-shrink:0}.tree-more{justify-self:start;height:28px;margin:4px 2px;color:var(--accent);font-size:12px;border-color:var(--line)}.tree-row .tag{color:#7ec8ff}.tree-row .meta{color:#b3becb}.muted{color:var(--muted)}.empty{padding:18px;color:var(--muted);text-align:center}.field{width:100%;background:#0d1118;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:7px 8px;font:inherit}.field.small{padding:5px 7px}.field,textarea,select{font-size:14px}.editor{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical;min-height:60px;max-height:35%;tab-size:2}.label{font-size:11px;color:var(--muted);margin:9px 0 4px}.detail-actions{display:flex;gap:5px;flex-wrap:wrap;padding:7px;border-bottom:1px solid var(--line)}.htmlview,.sourceview{margin:0;white-space:pre;overflow:auto;flex:1;padding:10px;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;tab-size:2;color:#d7e2ef}.tok-tag{color:#76c7ff}.tok-attr{color:#c6a0f6}.tok-str{color:#a7dc8b}.tok-comment{color:#718096}.tok-text{color:#d7e2ef}.tok-key{color:#f0c674}.tok-num{color:#ef9f76}.tok-punc{color:#b9c5d3}.status{min-height:24px;padding:3px 9px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:center}.status .right{margin-left:auto}.consolepanel{flex-direction:column}.consolelog{flex:1;min-height:0;overflow:auto;padding:5px}.entry{padding:5px 8px;border-bottom:1px solid #ffffff0b;white-space:pre-wrap;overflow-wrap:anywhere}.entry.warn{background:#7d5b1b22}.entry.error{background:#842d3828}.entry.debug{color:#b1a5cf}.entry .stamp{color:#8594a7;font-size:10px;margin-right:7px}.entry .kind{font-weight:700;margin-right:6px}.command-area{border-top:1px solid var(--line);padding:7px;display:flex;gap:7px;align-items:flex-end}.command-area textarea{flex:1;min-height:40px;max-height:125px;resize:vertical;font:13px/1.4 ui-monospace,monospace}.resourcepanel{flex-direction:column}.resource-type{display:flex;padding:6px 8px;gap:4px;border-bottom:1px solid var(--line)}.resource-type button[aria-pressed="true"]{background:#2d4056}.reslist{flex:1;min-height:0;overflow:auto}.resrow{display:grid;grid-template-columns:minmax(90px,1fr) minmax(80px,2fr);gap:8px;padding:7px 9px;border-bottom:1px solid #ffffff0a;cursor:pointer}.resrow:hover{background:#ffffff0a}.resrow.selected{background:#23507a}.reskey,.resvalue{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.reskey{font:12px ui-monospace,monospace;color:#a9d5ff}.resvalue{color:var(--muted)}.filterbox{width:150px}.sourcepanel{flex-direction:column}.sourcebar{display:flex;align-items:center;gap:7px;padding:5px 8px;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted)}.sourceview{flex:1}.sourcebar button[aria-pressed="true"]{background:#2d4056;border-color:#47607c}.menu{position:absolute;z-index:9;width:250px;max-width:calc(100% - 16px);display:flex;flex-direction:column;gap:2px;padding:4px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px #000a}.menu button{height:auto;flex-direction:column;align-items:flex-start;gap:1px;padding:7px 10px;text-align:left}.menu .hint{font-size:11px;color:var(--muted)}.dialogbox.wide{width:min(640px,100%)}.urlgroup{margin-top:10px}.urlgroup-head{display:flex;align-items:center;gap:6px;font-weight:600;font-size:12px}.urllist{max-height:180px;overflow:auto;margin-top:4px;padding:3px;border:1px solid var(--line);border-radius:6px;background:#0d1118}.urlrow{display:flex;gap:6px;align-items:flex-start;padding:2px 4px;font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}.urlrow input,.urlgroup-head input{margin:2px 0 0;flex:none}.exportprogress{margin-top:10px;font-size:12px;color:var(--muted);min-height:1.4em}.notice{background:#573e14;color:#ffe1a3;padding:6px 9px;font-size:11px}.resize{position:absolute;z-index:5;touch-action:none}.resize.e,.resize.w{top:14px;bottom:14px;width:10px;cursor:ew-resize}.resize.e{right:-4px}.resize.w{left:-4px}.resize.n,.resize.s{height:10px;left:14px;right:14px;cursor:ns-resize}.resize.n{top:-4px}.resize.s{bottom:-4px}.resize.ne,.resize.nw,.resize.se,.resize.sw{width:18px;height:18px;z-index:6}.resize.ne{right:-4px;top:-4px;cursor:nesw-resize}.resize.nw{left:-4px;top:-4px;cursor:nwse-resize}.resize.se{right:-4px;bottom:-4px;cursor:nwse-resize}.resize.sw{left:-4px;bottom:-4px;cursor:nesw-resize}.ghost{position:fixed;z-index:2147483645;border:2px solid #70c5ff;background:#55aeef33;border-radius:10px;pointer-events:none;display:none;transition:all .18s}.wi.collapsed .tabs,.wi.collapsed .toolbar,.wi.collapsed .content,.wi.collapsed .status,.wi.collapsed .resize{display:none}.wi.collapsed{height:44px!important;min-height:44px!important;border-radius:10px}.wi.dock-left,.wi.dock-right{border-radius:0}.wi.dock-top,.wi.dock-bottom{border-radius:0}.wi.dock-top .title{order:2;border-top:1px solid var(--line);border-bottom:0}.wi.dock-top .tabs{order:0}.wi.dock-top .toolbar{order:1}.wi.dock-top .content{order:0}.wi.dock-bottom .title{order:0}.wi.dock-bottom .tabs{order:1}.wi.dock-bottom .toolbar{order:2}.wi.dock-bottom .content{order:3}/* Geometry already anchors vertical docks; translating during the height animation hides the title. */.wi.dock-top.collapsed,.wi.dock-bottom.collapsed{transform:none}.wi.dock-left.collapsed{transform:translateX(calc(-100% + 54px))}.wi.dock-right.collapsed{transform:translateX(calc(100% - 54px))}.wi.dock-left.collapsed .title [data-action="collapse"]{order:1}.wi.dock-right.collapsed .title [data-action="collapse"]{order:-1}.dialog{position:absolute;z-index:10;inset:0;background:#0009;display:grid;place-items:center;padding:16px}.dialogbox{width:min(440px,100%);max-height:90%;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;box-shadow:0 15px 55px #000b}.dialogbox h3{margin:0 0 10px}.dialogbox .actions{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}.footerhint{font-size:11px;color:var(--muted)}
+      button{font:inherit;color:inherit;border:1px solid transparent;background:transparent;border-radius:7px;min-width:36px;height:34px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 8px}button:hover{background:#ffffff12;border-color:#ffffff14}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}.icon{font-size:16px;line-height:1}.title button{width:38px;height:38px;font-size:18px}.close:hover{background:#9f3942}.tabs{display:flex;gap:4px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow:auto;scrollbar-width:thin}.tab{white-space:nowrap;color:var(--muted);padding:5px 11px}.tab[aria-selected="true"]{color:var(--text);background:#2d4056;border-color:#47607c}.toolbar{display:flex;align-items:center;gap:4px;min-height:42px;padding:4px 8px;background:#141a23;border-bottom:1px solid var(--line);overflow:auto}.toolbar .spacer{flex:1}.toolbar button{min-width:36px}.content{position:relative;display:flex;flex:1;min-height:0;overflow:hidden}.panel{display:none;flex:1;min-height:0;min-width:0}.panel.active{display:flex}.columns{display:flex;flex:1;min-width:0;min-height:0}.treepane{width:42%;min-width:115px;border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}.detailpane{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}.subhead{padding:6px 9px;color:var(--muted);font-size:11px;letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}.tree,.scroll{overflow:auto;overscroll-behavior:contain;min-height:0;flex:1;padding:6px}.tree{display:grid;grid-template-columns:minmax(max-content,1fr);align-content:start}.tree-row{box-sizing:border-box;height:auto;min-height:25px;display:flex;align-items:center;gap:4px;padding:2px 5px;border-radius:5px;white-space:nowrap;cursor:pointer;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.tree-row:hover{background:#ffffff0a}.tree-row.selected{background:#23507a;color:#fff}.tree-row .twisty{width:18px;min-width:18px;height:22px;padding:0;color:var(--muted)}.tree-row .twisty,.tree-row .tag{flex-shrink:0}.tree-more{justify-self:start;height:28px;margin:4px 2px;color:var(--accent);font-size:12px;border-color:var(--line)}.tree-row .tag{color:#7ec8ff}.tree-row .meta{color:#b3becb}.muted{color:var(--muted)}.empty{padding:18px;color:var(--muted);text-align:center}.field{width:100%;background:#0d1118;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:7px 8px;font:inherit}.field.small{padding:5px 7px}.field,textarea,select{font-size:14px}.editor{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical;min-height:60px;max-height:35%;tab-size:2}.label{font-size:11px;color:var(--muted);margin:9px 0 4px}.detail-actions{display:flex;gap:5px;flex-wrap:wrap;padding:7px;border-bottom:1px solid var(--line)}.htmlview,.sourceview{margin:0;white-space:pre;overflow:auto;flex:1;padding:10px;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;tab-size:2;color:#d7e2ef}.tok-tag{color:#76c7ff}.tok-attr{color:#c6a0f6}.tok-str{color:#a7dc8b}.tok-comment{color:#718096}.tok-text{color:#d7e2ef}.tok-key{color:#f0c674}.tok-num{color:#ef9f76}.tok-punc{color:#b9c5d3}.status{min-height:24px;padding:3px 9px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:center}.status .right{margin-left:auto}.consolepanel{flex-direction:column}.consolelog{flex:1;min-height:0;overflow:auto;padding:5px}.entry{padding:5px 8px;border-bottom:1px solid #ffffff0b;white-space:pre-wrap;overflow-wrap:anywhere}.entry.warn{background:#7d5b1b22}.entry.error{background:#842d3828}.entry.debug{color:#b1a5cf}.entry .stamp{color:#8594a7;font-size:10px;margin-right:7px}.entry .kind{font-weight:700;margin-right:6px}.command-area{border-top:1px solid var(--line);padding:7px;display:flex;gap:7px;align-items:flex-end}.command-area textarea{flex:1;min-height:40px;max-height:125px;resize:vertical;font:13px/1.4 ui-monospace,monospace}.resourcepanel{flex-direction:column}.resource-type{display:flex;padding:6px 8px;gap:4px;border-bottom:1px solid var(--line)}.resource-type button[aria-pressed="true"]{background:#2d4056}.reslist{flex:1;min-height:0;overflow:auto}.resrow{display:grid;grid-template-columns:minmax(90px,1fr) minmax(80px,2fr);gap:8px;padding:7px 9px;border-bottom:1px solid #ffffff0a;cursor:pointer}.resrow:hover{background:#ffffff0a}.resrow.selected{background:#23507a}.reskey,.resvalue{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.reskey{font:12px ui-monospace,monospace;color:#a9d5ff}.resvalue{color:var(--muted)}.filterbox{width:150px}.sourcepanel{flex-direction:column}.sourcebar{display:flex;align-items:center;gap:7px;padding:5px 8px;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted)}.sourceview{flex:1}.sourcebar button[aria-pressed="true"]{background:#2d4056;border-color:#47607c}.menu{position:absolute;z-index:9;width:250px;max-width:calc(100% - 16px);display:flex;flex-direction:column;gap:2px;padding:4px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px #000a}.menu button{height:auto;flex-direction:column;align-items:flex-start;gap:1px;padding:7px 10px;text-align:left}.menu .hint{font-size:11px;color:var(--muted)}.dialogbox.wide{width:min(640px,100%)}.dialogbox.wide .actions{position:sticky;bottom:-14px;margin:12px -14px -14px;padding:10px 14px;background:var(--panel);border-top:1px solid var(--line)}.urlgroup{margin-top:10px}.urlgroup-head{display:flex;align-items:center;gap:6px;font-weight:600;font-size:12px}.urllist{max-height:180px;overflow:auto;margin-top:4px;padding:3px;border:1px solid var(--line);border-radius:6px;background:#0d1118}.urlrow{display:flex;gap:6px;align-items:flex-start;padding:2px 4px;font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}.urlrow input,.urlgroup-head input{margin:2px 0 0;flex:none}.urlinfo{color:var(--muted);font-size:10.5px}.urlnotes summary{cursor:pointer;font-weight:600;font-size:12px}.urlnotes .urlrow{color:var(--muted)}.exportprogress{margin-top:10px;font-size:12px;color:var(--muted);min-height:1.4em}.notice{background:#573e14;color:#ffe1a3;padding:6px 9px;font-size:11px}.resize{position:absolute;z-index:5;touch-action:none}.resize.e,.resize.w{top:14px;bottom:14px;width:10px;cursor:ew-resize}.resize.e{right:-4px}.resize.w{left:-4px}.resize.n,.resize.s{height:10px;left:14px;right:14px;cursor:ns-resize}.resize.n{top:-4px}.resize.s{bottom:-4px}.resize.ne,.resize.nw,.resize.se,.resize.sw{width:18px;height:18px;z-index:6}.resize.ne{right:-4px;top:-4px;cursor:nesw-resize}.resize.nw{left:-4px;top:-4px;cursor:nwse-resize}.resize.se{right:-4px;bottom:-4px;cursor:nwse-resize}.resize.sw{left:-4px;bottom:-4px;cursor:nesw-resize}.ghost{position:fixed;z-index:2147483645;border:2px solid #70c5ff;background:#55aeef33;border-radius:10px;pointer-events:none;display:none;transition:all .18s}.wi.collapsed .tabs,.wi.collapsed .toolbar,.wi.collapsed .content,.wi.collapsed .status,.wi.collapsed .resize{display:none}.wi.collapsed{height:44px!important;min-height:44px!important;border-radius:10px}.wi.dock-left,.wi.dock-right{border-radius:0}.wi.dock-top,.wi.dock-bottom{border-radius:0}.wi.dock-top .title{order:2;border-top:1px solid var(--line);border-bottom:0}.wi.dock-top .tabs{order:0}.wi.dock-top .toolbar{order:1}.wi.dock-top .content{order:0}.wi.dock-bottom .title{order:0}.wi.dock-bottom .tabs{order:1}.wi.dock-bottom .toolbar{order:2}.wi.dock-bottom .content{order:3}/* Geometry already anchors vertical docks; translating during the height animation hides the title. */.wi.dock-top.collapsed,.wi.dock-bottom.collapsed{transform:none}.wi.dock-left.collapsed{transform:translateX(calc(-100% + 54px))}.wi.dock-right.collapsed{transform:translateX(calc(100% - 54px))}.wi.dock-left.collapsed .title [data-action="collapse"]{order:1}.wi.dock-right.collapsed .title [data-action="collapse"]{order:-1}.dialog{position:absolute;z-index:10;inset:0;background:#0009;display:grid;place-items:center;padding:16px}.dialogbox{width:min(440px,100%);max-height:90%;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;box-shadow:0 15px 55px #000b}.dialogbox h3{margin:0 0 10px}.dialogbox .actions{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}.footerhint{font-size:11px;color:var(--muted)}
       .fa-icon{display:inline-block;width:1em;height:1em;flex:none;fill:currentColor;pointer-events:none}
       .logo .fa-icon{width:14px;height:14px}.tree-row .twisty .fa-icon{width:10px;height:10px}.tree-row .twisty.leaf .fa-icon{width:4px;height:4px}
       .tree-row .hidden-indicator{color:var(--muted);margin-right:4px}
@@ -1024,42 +1024,239 @@
 
     // "All files": find URLs in the source text, fetch the chosen ones with the
     // page's own fetch (so normal cross-origin rules apply), and save a ZIP.
+    // URL groups in the "All files" dialog: [kind, label, hint, checked by default].
     const URL_KINDS = [
       ['resource', 'Page resources', 'Scripts, styles, images, fonts and media the page loads', true],
-      ['link', 'Linked pages', 'Pages reached by links and forms', false],
-      ['other', 'Other URLs in code', 'Addresses found in scripts, text and other attributes', false],
+      ['link', 'Linked pages', 'Pages reached by links and GET forms', false],
+      ['other', 'Other files in code', 'File URLs (a file name with an extension) found in scripts, text and other attributes', false],
+      ['dynamic', 'Built in code', 'URLs assembled by script expressions, with the value they were resolved to', false],
     ];
+    const KIND_RANK = { resource: 0, link: 1, dynamic: 2, other: 3 };
+    const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'CONNECT', 'TRACE']);
     const MAX_EXPORT_URLS = 1000, MAX_EXPORT_BYTES = 250 * 1024 * 1024, EXPORT_CONCURRENCY = 4, EXPORT_TIMEOUT = 20000;
-    function decodeEntities(text) { return text.replace(/&(amp|quot|#39|lt|gt|nbsp);/g, (m, e) => ({ amp: '&', quot: '"', '#39': "'", lt: '<', gt: '>', nbsp: ' ' }[e])); }
-    function scanSourceUrls(text) {
-      const rank = { resource: 0, link: 1, other: 2 }, found = new Map();
-      const add = (raw, kind) => {
-        const value = decodeEntities(String(raw || '').trim());
-        if (!value || value.startsWith('#') || /^(data|blob|javascript|mailto|tel|about|sms):/i.test(value)) return;
-        let url; try { url = new URL(value, document.baseURI); } catch (_) { return; }
-        if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
-        url.hash = '';
-        const previous = found.get(url.href);
-        if (!previous || rank[kind] < rank[previous.kind]) found.set(url.href, { url: url.href, kind });
-      };
-      const cssUrls = css => {
-        for (const m of css.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)'"\s]+))\s*\)/gi)) add(m[1] ?? m[2] ?? m[3], 'resource');
-        for (const m of css.matchAll(/@import\s+["']([^"']+)["']/gi)) add(m[1], 'resource');
-      };
+    const MAX_SCAN_FILES = 40, MAX_SCAN_CHARS = 5 * 1024 * 1024;
+    const JS_STRING = /(["'])((?:\\.|(?!\1)[^\\\n])*)\1|`((?:\\.|[^\\`])*)`/g;
+    function decodeEntities(text) { return text.replace(/&(amp|quot|#39|lt|gt|nbsp);/g, (m, e) => ({ amp: '&', quot: '"', '#39': "'", lt: '<', gt: '>', nbsp: '\u00a0' }[e])); }
+    function unescapeJs(text) {
+      return text.replace(/\\(u\{[0-9a-f]+\}|u[0-9a-f]{4}|x[0-9a-f]{2}|[\s\S])/gi, (m, e) => {
+        if (/^u\{/i.test(e)) { try { return String.fromCodePoint(parseInt(e.slice(2, -1), 16)); } catch (_) { return e; } }
+        if (/^[ux][0-9a-f]/i.test(e)) return String.fromCharCode(parseInt(e.slice(1), 16));
+        return { n: '\n', t: '\t', r: '\r', '\n': '' }[e] ?? e;
+      });
+    }
+    function escapeRegExp(text) { return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+    function shortCode(text) { const flat = text.replace(/\s+/g, ' ').trim(); return flat.length > 160 ? `${flat.slice(0, 157)}…` : flat; }
+    function fileLabel(href) { try { const url = new URL(href); return url.pathname.split('/').filter(Boolean).pop() || url.host; } catch (_) { return href; } }
+    // A file URL names a file: its last path segment has an extension.
+    function isFileUrl(href) { try { return /^[^/]*[^/.][^/]*\.[a-z0-9]{1,8}$/i.test(new URL(href).pathname.split('/').pop()); } catch (_) { return false; } }
+    // Index of the bracket closing the one at `open`, skipping quoted strings.
+    function closingBracket(text, open) {
+      const pairs = { '(': ')', '[': ']', '{': '}' }, stack = [];
+      for (let i = open; i < text.length; i++) {
+        const c = text[i];
+        if (c === '"' || c === "'" || c === '`') { for (i++; i < text.length && text[i] !== c; i++) if (text[i] === '\\') i++; continue; }
+        if (pairs[c]) stack.push(pairs[c]);
+        else if (c === ')' || c === ']' || c === '}') { if (stack.pop() !== c) return -1; if (!stack.length) return i; }
+      }
+      return -1;
+    }
+    function enclosingObject(text, index) {
+      let depth = 0;
+      for (let i = index - 1; i >= Math.max(0, index - 2000); i--) {
+        if (text[i] === '}') depth++;
+        else if (text[i] === '{') { if (!depth) { const close = closingBracket(text, i); return close < 0 ? null : text.slice(i, close + 1); } depth--; }
+      }
+      return null;
+    }
+
+    function newScan() { return { found: new Map(), notes: [], noteKeys: new Set(), blocked: new Set(), scripts: [], scannable: new Map() }; }
+    function addUrl(scan, raw, kind, base, from, info) {
+      const value = String(raw ?? '').trim();
+      if (!value || value.startsWith('#') || /^(data|blob|javascript|mailto|tel|about|sms):/i.test(value)) return null;
+      let url; try { url = new URL(value, base); } catch (_) { return null; }
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+      url.hash = '';
+      if (kind === 'other' && !isFileUrl(url.href)) return null;
+      const previous = scan.found.get(url.href);
+      if (!previous || KIND_RANK[kind] < KIND_RANK[previous.kind]) scan.found.set(url.href, { url: url.href, kind, from, info });
+      return url.href;
+    }
+    function addNote(scan, text) { if (!scan.noteKeys.has(text)) { scan.noteKeys.add(text); scan.notes.push(text); } }
+    function blockUrl(scan, raw, base, method, from) {
+      let href = raw; try { href = new URL(raw, base).href.replace(/#.*$/, ''); } catch (_) {}
+      scan.blocked.add(href);
+      addNote(scan, `${method} ${href} (in ${from}): not downloaded, only GET requests are fetched`);
+    }
+    function scanCss(scan, css, base, from) {
+      for (const m of css.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)'"\s]+))\s*\)/gi)) addUrl(scan, m[1] ?? m[2] ?? m[3], 'resource', base, from);
+      for (const m of css.matchAll(/@import\s+["']([^"']+)["']/gi)) addUrl(scan, m[1], 'resource', base, from);
+    }
+    // Page HTML: tag attributes, inline styles, and inline scripts (kept for the JS pass).
+    function scanHtml(scan, html, base, from) {
+      let text = html.replace(/(<script\b[^>]*>)([\s\S]*?)(<\/script>)/gi, (m, open, body, close) => { if (body.trim()) scan.scripts.push({ text: body, base, from }); return open + close; });
+      text = text.replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi, (m, open, body, close) => { scanCss(scan, body, base, from); return open + close; });
       for (const tagMatch of text.matchAll(/<([a-zA-Z][\w:-]*)\b([^>]*)>/g)) {
-        const tag = tagMatch[1].toLowerCase();
-        for (const m of tagMatch[2].matchAll(/([^\s="'\/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g)) {
-          const name = m[1].toLowerCase(), value = m[2] ?? m[3] ?? m[4];
-          if (name === 'srcset' || name === 'imagesrcset') decodeEntities(value).split(',').forEach(part => add(part.trim().split(/\s+/)[0], 'resource'));
-          else if (name === 'src' || name === 'poster' || (name === 'data' && tag === 'object')) add(value, 'resource');
-          else if (name === 'href') add(value, tag === 'link' ? 'resource' : 'link');
-          else if (name === 'action' || name === 'formaction') add(value, 'link');
-          else if (name === 'style') cssUrls(decodeEntities(value));
+        const tag = tagMatch[1].toLowerCase(), attrs = {};
+        for (const m of tagMatch[2].matchAll(/([^\s="'\/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g)) attrs[m[1].toLowerCase()] = decodeEntities(m[2] ?? m[3] ?? m[4]);
+        for (const [name, value] of Object.entries(attrs)) {
+          if (name === 'srcset' || name === 'imagesrcset') value.split(',').forEach(part => addUrl(scan, part.trim().split(/\s+/)[0], 'resource', base, from));
+          else if (name === 'src' || name === 'poster' || (name === 'data' && tag === 'object')) {
+            const href = addUrl(scan, value, 'resource', base, from);
+            if (href && tag === 'script') scan.scannable.set(href, 'js');
+          } else if (name === 'href') {
+            const href = addUrl(scan, value, tag === 'link' ? 'resource' : 'link', base, from);
+            if (href && tag === 'link' && /(^|\s)stylesheet(\s|$)/i.test(attrs.rel || '')) scan.scannable.set(href, 'css');
+          } else if (name === 'action' || name === 'formaction') {
+            const method = (attrs[name === 'formaction' ? 'formmethod' : 'method'] || 'GET').toUpperCase();
+            if (method === 'GET') addUrl(scan, value, 'link', base, from); else blockUrl(scan, value, base, method, from);
+          } else if (name === 'style') scanCss(scan, value, base, from);
         }
       }
-      cssUrls(text);
-      for (const m of text.matchAll(/https?:\/\/[^\s"'<>`()\\{}|^]+/gi)) add(m[0].replace(/[.,;:!?]+$/, ''), 'other');
-      return [...found.values()];
+      for (const m of text.matchAll(/https?:\/\/[^\s"'<>`()\\{}|^]+/gi)) addUrl(scan, decodeEntities(m[0].replace(/[.,;:!?]+$/, '')), 'other', base, from);
+    }
+
+    // One operand of a "+" chain: a string, a number, or a name/member/call chain.
+    function readOperand(js, pos) {
+      const rest = js.slice(pos, pos + 600);
+      let m;
+      if ((m = /^(["'])((?:\\.|(?!\1)[^\\\n])*)\1/.exec(rest))) return { part: { lit: unescapeJs(m[2]) }, end: pos + m[0].length };
+      if ((m = /^`((?:\\.|[^\\`])*)`/.exec(rest))) return { part: m[1].includes('${') ? { expr: m[0] } : { lit: unescapeJs(m[1]) }, end: pos + m[0].length };
+      if ((m = /^\d+(?:\.\d+)?\b/.exec(rest))) return { part: { lit: m[0] }, end: pos + m[0].length };
+      const name = /^[A-Za-z_$][\w$]*/;
+      let i;
+      if (rest[0] === '(') { const close = closingBracket(rest, 0); if (close < 0) return null; i = close + 1; }
+      else { m = name.exec(rest); if (!m) return null; i = m[0].length; }
+      for (;;) {
+        if (rest[i] === '.' && (m = name.exec(rest.slice(i + 1)))) i += 1 + m[0].length;
+        else if (rest[i] === '(' || rest[i] === '[') { const close = closingBracket(rest, i); if (close < 0) return null; i = close + 1; }
+        else break;
+      }
+      return { part: { expr: rest.slice(0, i) }, end: pos + i };
+    }
+    // The HTTP method a URL expression is used with, when its call site says so.
+    function requestMethod(js, start, end) {
+      const before = js.slice(Math.max(0, start - 160), start), after = js.slice(end, end + 1500);
+      let m, method = null;
+      if ((m = /\.open\(\s*(["'`])([A-Za-z]+)\1\s*,\s*$/.exec(before))) method = m[2];
+      else if ((m = /\.(post|put|patch|delete)\(\s*$/i.exec(before))) method = m[1];
+      else if (/\bsendBeacon\(\s*$/.test(before)) method = 'POST';
+      else if (/(?:\bfetch|\bnew\s+Request)\(\s*$/.test(before)) {
+        const options = /^\s*,\s*\{/.exec(after), close = options ? closingBracket(after, options[0].length - 1) : -1;
+        m = close > 0 && /\bmethod\s*:\s*(["'`])([A-Za-z]+)\1/.exec(after.slice(0, close + 1));
+        method = m ? m[2] : 'GET';
+      } else if (/\burl\s*:\s*$/.test(before)) {
+        m = /\b(?:method|type)\s*:\s*(["'`])([A-Za-z]+)\1/.exec(enclosingObject(js, start) || '');
+        if (m) method = m[2];
+      }
+      method = method?.toUpperCase();
+      return HTTP_METHODS.has(method) ? method : null;
+    }
+    // Live value of a plain global (data properties only: no getters or code run).
+    function readLive(path) {
+      if (path[0] === 'window' || path[0] === 'self' || path[0] === 'globalThis') path = path.slice(1);
+      if (path[0] === 'document' && path[1] === 'location') path = path.slice(1);
+      if (path[0] === 'location' && path.length === 2 && ['href', 'origin', 'protocol', 'host', 'hostname', 'port', 'pathname', 'search', 'hash'].includes(path[1])) return location[path[1]];
+      let value = executionWindow;
+      for (const segment of path) {
+        if (value == null || (typeof value !== 'object' && typeof value !== 'function')) return null;
+        let descriptor = null;
+        try { for (let o = value; o && !descriptor; o = Object.getPrototypeOf(o)) descriptor = Object.getOwnPropertyDescriptor(o, segment); } catch (_) { return null; }
+        if (!descriptor || !('value' in descriptor)) return null;
+        value = descriptor.value;
+      }
+      return typeof value === 'string' || typeof value === 'number' ? String(value) : null;
+    }
+    // A string the code assigns to this name, when it assigns exactly one.
+    function readAssigned(name, corpus) {
+      const id = escapeRegExp(name), values = new Set();
+      // name = "value"  (not followed by "+", so the whole value is known)
+      const assigned = new RegExp(`(?:^|[^\\w$.])${id}\\s*=\\s*(["'\`])((?:\\\\.|(?!\\1)[^\\\\\\n])*)\\1\\s*(?=[;,\\n)}]|$)`, 'g');
+      // { name: "value" }
+      const property = new RegExp(`[{,]\\s*(["']?)${id}\\1\\s*:\\s*(["'\`])((?:\\\\.|(?!\\2)[^\\\\\\n])*)\\2\\s*(?=[,}\\n])`, 'g');
+      for (const m of corpus.matchAll(assigned)) values.add(unescapeJs(m[2]));
+      for (const m of corpus.matchAll(property)) values.add(unescapeJs(m[3]));
+      return values.size === 1 ? [...values][0] : null;
+    }
+    function resolveOperand(expr, corpus) {
+      expr = expr.trim();
+      let m;
+      if ((m = /^(["'])((?:\\.|(?!\1)[^\\\n])*)\1$/.exec(expr))) return unescapeJs(m[2]);
+      if (/^\d+(?:\.\d+)?$/.test(expr)) return expr;
+      if ((m = /^(String|encodeURIComponent|encodeURI)\(([\s\S]*)\)$/.exec(expr))) {
+        const inner = resolveOperand(m[2], corpus);
+        if (inner == null) return null;
+        try { return { String, encodeURIComponent, encodeURI }[m[1]](inner); } catch (_) { return null; }
+      }
+      if (!/^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*|\[\s*(["'])[^"'\]]*\1\s*\])*$/.test(expr)) return null;
+      const path = [...expr.matchAll(/[A-Za-z_$][\w$]*|\[\s*["']([^"']*)["']\s*\]/g)].map(p => p[1] ?? p[0]);
+      return readLive(path) ?? readAssigned(path[path.length - 1], corpus);
+    }
+    function loadedUrls() {
+      const urls = new Set();
+      try { for (const entry of executionWindow.performance.getEntriesByType('resource')) urls.add(entry.name); } catch (_) {}
+      for (const el of document.querySelectorAll('iframe[src],frame[src],embed[src],script[src],img[src],source[src],video[src],audio[src],link[href],a[href],object[data]')) {
+        if (excluded(el)) continue;
+        const value = el.currentSrc || el.src || el.href || el.data;
+        if (typeof value === 'string') urls.add(value);
+      }
+      return [...urls].filter(u => /^https?:/i.test(u));
+    }
+    function resolveParts(parts, base, corpus) {
+      const values = parts.map(p => p.lit ?? resolveOperand(p.expr, corpus));
+      if (values.every(v => v != null)) return { urls: [values.join('')], how: 'resolved from values in the page' };
+      // Otherwise match the pattern against URLs the page has actually loaded.
+      let head = values[0] ?? '';
+      if (head.startsWith('//')) head = location.protocol + head;
+      else if (head && !/^https?:/i.test(head)) { try { head = new URL(head, base).href; } catch (_) { return { urls: [] }; } }
+      if (!/^https?:\/\/[^/]+\//i.test(head)) return { urls: [] };
+      const pattern = new RegExp(`^${[head, ...values.slice(1)].map(v => v == null ? '.*?' : escapeRegExp(v)).join('')}$`);
+      const urls = loadedUrls().filter(u => pattern.test(u) || pattern.test(u.replace(/#.*$/, '')));
+      return urls.length && urls.length <= 10 ? { urls, how: 'matched a URL the page loaded' } : { urls: [] };
+    }
+    // Script text: URL strings, "+" concatenations and template literals.
+    function scanJs(scan, js, base, from, corpus) {
+      const literals = new RegExp(JS_STRING.source, 'g');
+      let m;
+      while ((m = literals.exec(js))) {
+        const start = m.index;
+        let parts;
+        if (m[3] !== undefined) {
+          parts = []; let last = 0;
+          for (const t of m[3].matchAll(/\$\{([^}]*)\}/g)) { if (t.index > last) parts.push({ lit: unescapeJs(m[3].slice(last, t.index)) }); parts.push({ expr: t[1] }); last = t.index + t[0].length; }
+          if (last < m[3].length) parts.push({ lit: unescapeJs(m[3].slice(last)) });
+        } else parts = [{ lit: unescapeJs(m[2]) }];
+        const head = parts[0]?.lit;
+        if (head == null) continue;
+        const absolute = /^(?:https?:)?\/\/[^\s/]/i.test(head), path = !absolute && /^\.{0,2}\/[^\s/*]/.test(head);
+        if (!absolute && !path) continue;
+        if (path && /\+\s*$/.test(js.slice(Math.max(0, start - 20), start))) continue; // the tail of a longer expression
+        let end = start + m[0].length;
+        for (;;) {
+          const plus = /^\s*\+\s*/.exec(js.slice(end, end + 50));
+          if (!plus) break;
+          const operand = readOperand(js, end + plus[0].length);
+          if (!operand) break;
+          parts.push(operand.part); end = operand.end;
+        }
+        literals.lastIndex = end;
+        const code = shortCode(js.slice(start, end));
+        const method = requestMethod(js, start, end);
+        const dynamic = parts.some(p => p.lit === undefined);
+        if (method && method !== 'GET') {
+          if (dynamic) addNote(scan, `${method} ${code} (in ${from}): not downloaded, only GET requests are fetched`);
+          else blockUrl(scan, parts.map(p => p.lit).join(''), base, method, from);
+          continue;
+        }
+        if (!dynamic) { addUrl(scan, parts.map(p => p.lit).join(''), 'other', base, from); continue; }
+        const { urls, how } = resolveParts(parts, base, corpus);
+        for (const url of urls) addUrl(scan, url, 'dynamic', base, from, `${code} · ${how}`);
+        if (!urls.length) addNote(scan, `Built in code, value unknown: ${code} (in ${from})`);
+      }
+    }
+    // Plain text (a resource value): JS-style strings plus bare URLs.
+    function scanText(scan, text, base, from) {
+      scanJs(scan, text, base, from, text);
+      for (const m of text.matchAll(/https?:\/\/[^\s"'<>`()\\{}|^]+/gi)) addUrl(scan, m[0].replace(/[.,;:!?]+$/, ''), 'other', base, from);
     }
     const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
     function crc32(bytes) { let c = 0xFFFFFFFF; for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
@@ -1116,80 +1313,124 @@
         return new Uint8Array(await response.arrayBuffer());
       } finally { clearTimeout(timer); signal.removeEventListener('abort', abort); }
     }
+    async function runPool(items, worker, signal) {
+      let next = 0;
+      await Promise.all(Array.from({ length: Math.min(EXPORT_CONCURRENCY, items.length) }, async () => {
+        while (next < items.length && !signal.aborted) await worker(items[next++]);
+      }));
+    }
+    // Find every URL: the page source first, then the page's own scripts and
+    // stylesheets (fetched once; the bytes are reused in the ZIP).
+    async function scanForExport(source, fetchCached, signal, progress) {
+      const scan = newScan(), base = document.baseURI, from = 'page source';
+      if (source.extension === 'html') scanHtml(scan, source.text, base, from);
+      else scanText(scan, source.text, base, source.name);
+      const files = [...scan.scannable].slice(0, MAX_SCAN_FILES);
+      let done = 0;
+      progress(`Scanning scripts and stylesheets: 0 of ${files.length}`);
+      await runPool(files, async ([href, type]) => {
+        try {
+          const bytes = await fetchCached(href);
+          if (bytes.length <= MAX_SCAN_CHARS) {
+            const text = new TextDecoder().decode(bytes);
+            if (type === 'css') scanCss(scan, text, href, fileLabel(href));
+            else scan.scripts.push({ text, base, from: fileLabel(href) });
+          }
+        } catch (_) { /* Reported if the file is chosen for download. */ }
+        progress(`Scanning scripts and stylesheets: ${++done} of ${files.length}`);
+      }, signal);
+      const corpus = scan.scripts.map(s => s.text).join('\n;\n');
+      for (const script of scan.scripts) scanJs(scan, script.text, script.base, script.from, corpus);
+      for (const href of scan.blocked) scan.found.delete(href);
+      return { urls: [...scan.found.values()], notes: scan.notes, scannedFiles: files.length };
+    }
     function openExportAllDialog() {
       const source = currentSource();
-      const urls = scanSourceUrls(source.text);
-      if (!urls.length) return setStatus('No downloadable URLs found in the source');
-      const shown = urls.slice(0, MAX_EXPORT_URLS);
       const modal = document.createElement('div'); modal.className = 'dialog';
       const box = document.createElement('div'); box.className = 'dialogbox wide'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', 'Export all files');
       const heading = document.createElement('h3'); heading.textContent = 'Export all files';
       const intro = document.createElement('div'); intro.className = 'footerhint';
-      intro.textContent = `Found ${urls.length} URL${urls.length === 1 ? '' : 's'} in the source${urls.length > shown.length ? ` (showing the first ${shown.length})` : ''}. Checked files are fetched by this page and saved with the source in a ZIP. Files on other sites download only if they allow cross-origin access; anything that fails is listed in download-report.txt.`;
-      box.append(heading, intro);
-      const boxes = [];
-      for (const [kind, label, hint, checked] of URL_KINDS) {
-        const items = shown.filter(u => u.kind === kind);
-        if (!items.length) continue;
-        const group = document.createElement('div'); group.className = 'urlgroup'; group.dataset.kind = kind;
-        const head = document.createElement('label'); head.className = 'urlgroup-head'; head.title = hint;
-        const all = document.createElement('input'); all.type = 'checkbox'; all.checked = checked; all.setAttribute('aria-label', `Select all ${label.toLowerCase()}`);
-        head.append(all, document.createTextNode(`${label} (${items.length})`));
-        const list = document.createElement('div'); list.className = 'urllist';
-        const groupBoxes = items.map(item => {
-          const row = document.createElement('label'); row.className = 'urlrow';
-          const check = document.createElement('input'); check.type = 'checkbox'; check.checked = checked; check.value = item.url;
-          const text = document.createElement('span'); text.textContent = item.url;
-          row.append(check, text); list.appendChild(row); boxes.push(check); return check;
-        });
-        all.addEventListener('change', () => { groupBoxes.forEach(c => { c.checked = all.checked; }); updateCount(); });
-        list.addEventListener('change', () => { const on = groupBoxes.filter(c => c.checked).length; all.checked = on === groupBoxes.length; all.indeterminate = on > 0 && on < groupBoxes.length; updateCount(); });
-        group.append(head, list); box.appendChild(group);
-      }
+      const body = document.createElement('div');
       const progress = document.createElement('div'); progress.className = 'exportprogress'; progress.setAttribute('aria-live', 'polite');
       const actions = document.createElement('div'); actions.className = 'actions';
       const cancel = document.createElement('button'); cancel.textContent = 'Cancel';
-      const start = document.createElement('button'); start.dataset.exportStart = 'true';
-      actions.append(cancel, start); box.append(progress, actions);
+      const start = document.createElement('button'); start.dataset.exportStart = 'true'; start.textContent = 'Download ZIP'; start.disabled = true;
+      actions.append(cancel, start); box.append(heading, intro, body, progress, actions);
       modal.appendChild(box); root.querySelector('.content').appendChild(modal);
-      function updateCount() { const n = boxes.filter(c => c.checked).length; start.textContent = n ? `Download ZIP (${n} file${n === 1 ? '' : 's'})` : 'Download ZIP (source only)'; }
-      updateCount();
-      let controller = null;
-      const close = () => { controller?.abort(); modal.remove(); };
+      const controller = new AbortController();
+      let downloading = false;
+      const close = () => { controller.abort(); modal.remove(); setStatus(statusText.textContent, 'No external requests'); };
       cancel.addEventListener('click', close);
-      modal.addEventListener('click', e => { if (e.target === modal && !controller) close(); });
+      modal.addEventListener('click', e => { if (e.target === modal && !downloading) close(); });
       modal.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); close(); } });
-      start.addEventListener('click', async () => {
-        const chosen = boxes.filter(c => c.checked).map(c => c.value);
-        controller = new AbortController();
-        boxes.forEach(c => { c.disabled = true; }); box.querySelectorAll('.urlgroup-head input').forEach(c => { c.disabled = true; }); start.disabled = true;
-        const used = new Set(), entries = [], report = [];
-        const sourceFile = `${safeFilename(source.name)}.${source.extension}`; used.add(sourceFile.toLowerCase());
-        entries.push({ path: sourceFile, data: source.text });
-        let done = 0, failed = 0, bytes = 0, next = 0;
-        const show = () => { progress.textContent = `Fetched ${done} of ${chosen.length}${failed ? ` · ${failed} failed` : ''}`; setStatus(progress.textContent, 'Fetching files on request'); };
-        show();
-        const worker = async () => {
-          while (next < chosen.length && !controller.signal.aborted) {
-            const href = chosen[next++];
+      cancel.focus();
+      const cache = new Map();
+      const fetchCached = href => { if (!cache.has(href)) cache.set(href, fetchBytes(href, controller.signal)); return cache.get(href); };
+      const show = text => { progress.textContent = text; setStatus(text, 'Fetching files on request'); };
+      scanForExport(source, fetchCached, controller.signal, show).then(({ urls, notes, scannedFiles }) => {
+        if (controller.signal.aborted) return;
+        progress.textContent = '';
+        setStatus('Choose the files to export', 'Fetching files on request');
+        const shown = urls.slice(0, MAX_EXPORT_URLS);
+        intro.textContent = `Found ${urls.length} URL${urls.length === 1 ? '' : 's'} in the source${scannedFiles ? ` and ${scannedFiles} script/stylesheet file${scannedFiles === 1 ? '' : 's'}` : ''}${urls.length > shown.length ? ` (showing the first ${shown.length})` : ''}. Checked files are fetched by this page and saved with the source in a ZIP. Files on other sites download only if they allow cross-origin access; anything that fails is listed in download-report.txt.`;
+        const boxes = [];
+        const updateCount = () => { const n = boxes.filter(c => c.checked).length; start.textContent = n ? `Download ZIP (${n} file${n === 1 ? '' : 's'})` : 'Download ZIP (source only)'; };
+        for (const [kind, label, hint, checked] of URL_KINDS) {
+          const items = shown.filter(u => u.kind === kind);
+          if (!items.length) continue;
+          const group = document.createElement('div'); group.className = 'urlgroup'; group.dataset.kind = kind;
+          const head = document.createElement('label'); head.className = 'urlgroup-head'; head.title = hint;
+          const all = document.createElement('input'); all.type = 'checkbox'; all.checked = checked; all.setAttribute('aria-label', `Select all ${label.toLowerCase()}`);
+          head.append(all, document.createTextNode(`${label} (${items.length})`));
+          const list = document.createElement('div'); list.className = 'urllist';
+          const groupBoxes = items.map(item => {
+            const row = document.createElement('label'); row.className = 'urlrow'; row.title = `Found in ${item.from}`;
+            const check = document.createElement('input'); check.type = 'checkbox'; check.checked = checked; check.value = item.url;
+            const text = document.createElement('span'); text.className = 'urltext'; text.textContent = item.url;
+            if (item.info) { const info = document.createElement('span'); info.className = 'urlinfo'; info.textContent = `from ${item.info}`; text.append(document.createElement('br'), info); }
+            row.append(check, text); list.appendChild(row); boxes.push(check); return check;
+          });
+          all.addEventListener('change', () => { groupBoxes.forEach(c => { c.checked = all.checked; }); updateCount(); });
+          list.addEventListener('change', () => { const on = groupBoxes.filter(c => c.checked).length; all.checked = on === groupBoxes.length; all.indeterminate = on > 0 && on < groupBoxes.length; updateCount(); });
+          group.append(head, list); body.appendChild(group);
+        }
+        if (!shown.length) { const none = document.createElement('div'); none.className = 'empty'; none.textContent = 'No downloadable URLs found. The ZIP will contain the source only.'; body.appendChild(none); }
+        if (notes.length) {
+          const details = document.createElement('details'); details.className = 'urlgroup urlnotes';
+          const summary = document.createElement('summary'); summary.textContent = `Not included (${notes.length})`;
+          const list = document.createElement('div'); list.className = 'urllist';
+          for (const note of notes) { const row = document.createElement('div'); row.className = 'urlrow'; row.textContent = note; list.appendChild(row); }
+          details.append(summary, list); body.appendChild(details);
+        }
+        updateCount(); start.disabled = false; start.focus();
+        start.addEventListener('click', async () => {
+          downloading = true;
+          const chosen = boxes.filter(c => c.checked).map(c => c.value);
+          box.querySelectorAll('input').forEach(c => { c.disabled = true; }); start.disabled = true;
+          const used = new Set(), entries = [], report = [];
+          const sourceFile = `${safeFilename(source.name)}.${source.extension}`; used.add(sourceFile.toLowerCase());
+          entries.push({ path: sourceFile, data: source.text });
+          let done = 0, failed = 0, bytes = 0;
+          const tick = () => show(`Fetched ${done} of ${chosen.length}${failed ? ` · ${failed} failed` : ''}`);
+          tick();
+          await runPool(chosen, async href => {
             try {
               if (bytes >= MAX_EXPORT_BYTES) throw new Error(`skipped: ZIP size limit (${MAX_EXPORT_BYTES / 1048576} MB) reached`);
-              const data = await fetchBytes(href, controller.signal);
+              const data = await fetchCached(href);
               bytes += data.length;
               const path = zipPathFor(href, used); entries.push({ path, data }); report.push(`OK      ${href}\n        -> ${path}`);
             } catch (e) { failed++; report.push(`FAILED  ${href}\n        ${e.message}`); }
-            done++; show();
-          }
-        };
-        await Promise.all(Array.from({ length: Math.min(EXPORT_CONCURRENCY, chosen.length) }, worker));
-        if (controller.signal.aborted) { setStatus('Export cancelled', 'No external requests'); return; }
-        entries.push({ path: 'download-report.txt', data: `Exported from ${location.href}\n${new Date().toISOString()}\nSource: ${sourceFile}\nFiles: ${chosen.length - failed} saved, ${failed} failed\n\n${report.join('\n')}\n` });
-        const zipName = `${safeFilename(source.name)}-files.zip`;
-        try { downloadBlob(buildZip(entries), zipName); setStatus(`Exported ${zipName}: ${chosen.length - failed} file${chosen.length - failed === 1 ? '' : 's'} saved${failed ? `, ${failed} failed (see download-report.txt)` : ''}`, `Fetched ${chosen.length} file${chosen.length === 1 ? '' : 's'} on request`); }
-        catch (e) { setStatus(`Export failed: ${e.message}`); }
-        modal.remove();
+            done++; tick();
+          }, controller.signal);
+          if (controller.signal.aborted) return;
+          const notesText = notes.length ? `\n\nNot included:\n${notes.map(n => `  ${n}`).join('\n')}` : '';
+          entries.push({ path: 'download-report.txt', data: `Exported from ${location.href}\n${new Date().toISOString()}\nSource: ${sourceFile}\nFiles: ${chosen.length - failed} saved, ${failed} failed\n\n${report.join('\n')}${notesText}\n` });
+          const zipName = `${safeFilename(source.name)}-files.zip`;
+          try { downloadBlob(buildZip(entries), zipName); setStatus(`Exported ${zipName}: ${chosen.length - failed} file${chosen.length - failed === 1 ? '' : 's'} saved${failed ? `, ${failed} failed (see download-report.txt)` : ''}`, `Fetched ${chosen.length} file${chosen.length === 1 ? '' : 's'} on request`); }
+          catch (e) { setStatus(`Export failed: ${e.message}`); }
+          modal.remove();
+        });
       });
-      start.focus();
     }
     function updateSourceButtons() {
       const beautify = root.querySelector('[data-action="beautify-source"]');

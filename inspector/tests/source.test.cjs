@@ -200,3 +200,90 @@ test('All files saves the source and fetched files in a ZIP with a report', asyn
   assert.equal(await inspector.locator('.dialog').count(), 0);
   assert.equal(await inspector.locator('#status-text').textContent(), 'Exported site.test-files.zip: 6 files saved, 2 failed (see download-report.txt)');
 });
+
+async function codePage(t) {
+  const context = await browser.newContext({ viewport: { width: 1000, height: 800 }, deviceScaleFactor: 1, acceptDownloads: true });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const html = `<!doctype html><html><head><link rel="icon" href="data:,"><script src="/app.js"></script></head><body>
+    <form method="post" action="/submit"><button>Send</button></form>
+    <script>
+      var paramString = "token=abc";
+      var casinoURL = "https://ogs-gl.nyxgib.eu/game/?" + String(paramString);
+      const lang = 'en';
+      const help = "/help/" + lang + "/guide.pdf";
+      const theme = \`https://site.test/assets/\${lang}/theme.css\`;
+      var random = "https://cdn.site.test/img/" + Math.random() + ".png";
+      function makeId() { return 7; }
+      fetch("/data/" + makeId() + ".json");
+      fetch("/api/save.json", { method: "POST", body: "x" });
+      fetch("/api/list.json");
+      const ajax = { ajax() {} }; ajax.ajax({ url: "/api/remove.json", type: "DELETE" });
+      navigator.sendBeacon("/beacon.gif", "d");
+      const home = "https://www.google.com";
+      const folder = "https://site.test/about/";
+      const report = "https://site.test/files/report.pdf?dl=1";
+    </script></body></html>`;
+  await page.route('**/*', route => {
+    const url = route.request().url();
+    if (url === 'https://site.test/') return route.fulfill({ status: 200, contentType: 'text/html', body: html });
+    if (url === 'https://site.test/app.js') return route.fulfill({ status: 200, contentType: 'text/javascript', body: 'const api = "https://site.test/v1/config.json"; const xhr = new XMLHttpRequest(); xhr.open("POST", "https://site.test/v1/log.json");' });
+    if (url === 'https://ogs-gl.nyxgib.eu/game/?token=abc') return route.abort('accessdenied');
+    return route.fulfill({ status: 200, contentType: 'application/json', body: `{"url":"${url}"}` });
+  });
+  await page.goto('https://site.test/');
+  await page.waitForLoadState('networkidle');
+  await page.evaluate(source => (0, eval)(source), script);
+  t.after(async () => { await context.close(); assert.deepEqual(errors, []); });
+  const inspector = page.locator('#web-inspector-host-v1');
+  await inspector.locator('[data-tab="source"]').click();
+  await inspector.locator('[data-action="export-source"]').click();
+  await inspector.locator('[data-action="export-all-files"]').click();
+  await inspector.locator('[data-export-start]:not([disabled])').waitFor();
+  return { page, inspector };
+}
+const groupUrls = async (inspector, kind) => (await inspector.locator(`.urlgroup[data-kind="${kind}"] .urltext`).allInnerTexts()).map(text => text.split('\n')[0]).sort();
+
+test('Other files in code lists only URLs naming a file, including in fetched scripts', async t => {
+  const { inspector } = await codePage(t);
+  assert.deepEqual(await groupUrls(inspector, 'other'), [
+    'https://site.test/api/list.json', 'https://site.test/files/report.pdf?dl=1', 'https://site.test/v1/config.json',
+  ]);
+  const all = (await inspector.locator('.urltext').allInnerTexts()).join('\n');
+  assert.ok(!all.includes('google.com') && !all.includes('/about/'), all);
+});
+
+test('URLs built by expressions are resolved from page values or loaded URLs', async t => {
+  const { inspector } = await codePage(t);
+  assert.deepEqual(await groupUrls(inspector, 'dynamic'), [
+    'https://ogs-gl.nyxgib.eu/game/?token=abc', 'https://site.test/assets/en/theme.css',
+    'https://site.test/data/7.json', 'https://site.test/help/en/guide.pdf',
+  ]);
+  const casino = inspector.locator('.urlrow', { hasText: 'ogs-gl.nyxgib.eu' });
+  assert.match(await casino.innerText(), /from "https:\/\/ogs-gl\.nyxgib\.eu\/game\/\?" \+ String\(paramString\) · resolved from values in the page/);
+  assert.match(await inspector.locator('.urlrow', { hasText: '/data/7.json' }).innerText(), /matched a URL the page loaded/);
+  assert.ok(!(await casino.locator('input').isChecked()));
+});
+
+test('non-GET requests and unresolvable expressions are noted, not included', async t => {
+  const { page, inspector } = await codePage(t);
+  await inspector.locator('details.urlnotes summary').click();
+  const notes = await inspector.locator('details.urlnotes .urlrow').allInnerTexts();
+  for (const expected of [
+    'POST https://site.test/submit (in page source)', 'POST https://site.test/api/save.json (in page source)',
+    'DELETE https://site.test/api/remove.json (in page source)', 'POST https://site.test/beacon.gif (in page source)',
+    'POST https://site.test/v1/log.json (in app.js)',
+    'Built in code, value unknown: "https://cdn.site.test/img/" + Math.random() + ".png" (in page source)',
+  ]) assert.ok(notes.some(note => note.startsWith(expected)), `${expected}\n${notes.join('\n')}`);
+  const all = (await inspector.locator('.urltext').allInnerTexts()).join('\n');
+  for (const url of ['/submit', '/api/save.json', '/api/remove.json', '/beacon.gif', '/v1/log.json']) assert.ok(!all.includes(url), url);
+
+  await inspector.locator('.urlgroup[data-kind="dynamic"] .urlgroup-head input').check();
+  const [download] = await Promise.all([page.waitForEvent('download'), inspector.locator('[data-export-start]').click()]);
+  const files = readZip(fs.readFileSync(await download.path()));
+  assert.equal(files.get('files/site.test/help/en/guide.pdf'), '{"url":"https://site.test/help/en/guide.pdf"}');
+  const reportText = files.get('download-report.txt');
+  assert.match(reportText, /FAILED {2}https:\/\/ogs-gl\.nyxgib\.eu\/game\/\?token=abc/);
+  assert.match(reportText, /Not included:\n {2}POST https:\/\/site\.test\/submit/);
+});
