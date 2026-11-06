@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Inspector
 // @namespace    https://github.com/iant89/userscripts
-// @version      0.5.0
+// @version      0.6.0
 // @description  A mobile-friendly, self-contained web inspector for the current page.
 // @match        *://*/*
 // @run-at       document-start
@@ -341,7 +341,7 @@
       .wi.idle{opacity:.76}.wi.dragging,.wi.resizing{transition:none;opacity:1}.wi.closed{display:none}
       .title{height:44px;min-height:44px;display:flex;align-items:center;gap:8px;padding:0 8px 0 12px;background:linear-gradient(110deg,#26364b,#1c2634);border-bottom:1px solid var(--line);touch-action:none;user-select:none;cursor:grab}
       .title:active{cursor:grabbing}.brand{display:flex;align-items:center;gap:8px;min-width:0;flex:1}.logo{width:24px;height:24px;border-radius:7px;background:#388bd0;display:grid;place-items:center;font-weight:800;color:white}.titletext{font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.context{color:var(--muted);font-size:11px;margin-left:3px}
-      button{font:inherit;color:inherit;border:1px solid transparent;background:transparent;border-radius:7px;min-width:36px;height:34px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 8px}button:hover{background:#ffffff12;border-color:#ffffff14}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}.icon{font-size:16px;line-height:1}.title button{width:38px;height:38px;font-size:18px}.close:hover{background:#9f3942}.tabs{display:flex;gap:4px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow:auto;scrollbar-width:thin}.tab{white-space:nowrap;color:var(--muted);padding:5px 11px}.tab[aria-selected="true"]{color:var(--text);background:#2d4056;border-color:#47607c}.toolbar{display:flex;align-items:center;gap:4px;min-height:42px;padding:4px 8px;background:#141a23;border-bottom:1px solid var(--line);overflow:auto}.toolbar .spacer{flex:1}.toolbar button{min-width:36px}.content{position:relative;display:flex;flex:1;min-height:0;overflow:hidden}.panel{display:none;flex:1;min-height:0;min-width:0}.panel.active{display:flex}.columns{display:flex;flex:1;min-width:0;min-height:0}.treepane{width:42%;min-width:115px;border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}.detailpane{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}.subhead{padding:6px 9px;color:var(--muted);font-size:11px;letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}.tree,.scroll{overflow:auto;overscroll-behavior:contain;min-height:0;flex:1;padding:6px}.tree{display:grid;grid-template-columns:minmax(max-content,1fr);align-content:start}.tree-row{box-sizing:border-box;height:auto;min-height:25px;display:flex;align-items:center;gap:4px;padding:2px 5px;border-radius:5px;white-space:nowrap;cursor:pointer;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.tree-row:hover{background:#ffffff0a}.tree-row.selected{background:#23507a;color:#fff}.tree-row .twisty{width:18px;min-width:18px;height:22px;padding:0;color:var(--muted)}.tree-row .twisty,.tree-row .tag{flex-shrink:0}.tree-more{justify-self:start;height:28px;margin:4px 2px;color:var(--accent);font-size:12px;border-color:var(--line)}.tree-row .tag{color:#7ec8ff}.tree-row .meta{color:#b3becb}.muted{color:var(--muted)}.empty{padding:18px;color:var(--muted);text-align:center}.field{width:100%;background:#0d1118;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:7px 8px;font:inherit}.field.small{padding:5px 7px}.field,textarea,select{font-size:14px}.editor{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical;min-height:60px;max-height:35%;tab-size:2}.label{font-size:11px;color:var(--muted);margin:9px 0 4px}.detail-actions{display:flex;gap:5px;flex-wrap:wrap;padding:7px;border-bottom:1px solid var(--line)}.htmlview,.sourceview{margin:0;white-space:pre;overflow:auto;flex:1;padding:10px;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;tab-size:2;color:#d7e2ef}.tok-tag{color:#76c7ff}.tok-attr{color:#c6a0f6}.tok-str{color:#a7dc8b}.tok-comment{color:#718096}.tok-text{color:#d7e2ef}.tok-key{color:#f0c674}.tok-num{color:#ef9f76}.tok-punc{color:#b9c5d3}.status{min-height:24px;padding:3px 9px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:center}.status .right{margin-left:auto}.consolepanel{flex-direction:column}.consolelog{flex:1;min-height:0;overflow:auto;padding:5px}.entry{padding:5px 8px;border-bottom:1px solid #ffffff0b;white-space:pre-wrap;overflow-wrap:anywhere}.entry.warn{background:#7d5b1b22}.entry.error{background:#842d3828}.entry.debug{color:#b1a5cf}.entry .stamp{color:#8594a7;font-size:10px;margin-right:7px}.entry .kind{font-weight:700;margin-right:6px}.command-area{border-top:1px solid var(--line);padding:7px;display:flex;gap:7px;align-items:flex-end}.command-area textarea{flex:1;min-height:40px;max-height:125px;resize:vertical;font:13px/1.4 ui-monospace,monospace}.resourcepanel{flex-direction:column}.resource-type{display:flex;padding:6px 8px;gap:4px;border-bottom:1px solid var(--line)}.resource-type button[aria-pressed="true"]{background:#2d4056}.reslist{flex:1;min-height:0;overflow:auto}.resrow{display:grid;grid-template-columns:minmax(90px,1fr) minmax(80px,2fr);gap:8px;padding:7px 9px;border-bottom:1px solid #ffffff0a;cursor:pointer}.resrow:hover{background:#ffffff0a}.resrow.selected{background:#23507a}.reskey,.resvalue{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.reskey{font:12px ui-monospace,monospace;color:#a9d5ff}.resvalue{color:var(--muted)}.filterbox{width:150px}.sourcepanel{flex-direction:column}.sourcebar{display:flex;align-items:center;gap:7px;padding:5px 8px;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted)}.sourceview{flex:1}.sourcebar button[aria-pressed="true"]{background:#2d4056;border-color:#47607c}.notice{background:#573e14;color:#ffe1a3;padding:6px 9px;font-size:11px}.resize{position:absolute;z-index:5;touch-action:none}.resize.e,.resize.w{top:14px;bottom:14px;width:10px;cursor:ew-resize}.resize.e{right:-4px}.resize.w{left:-4px}.resize.n,.resize.s{height:10px;left:14px;right:14px;cursor:ns-resize}.resize.n{top:-4px}.resize.s{bottom:-4px}.resize.ne,.resize.nw,.resize.se,.resize.sw{width:18px;height:18px;z-index:6}.resize.ne{right:-4px;top:-4px;cursor:nesw-resize}.resize.nw{left:-4px;top:-4px;cursor:nwse-resize}.resize.se{right:-4px;bottom:-4px;cursor:nwse-resize}.resize.sw{left:-4px;bottom:-4px;cursor:nesw-resize}.ghost{position:fixed;z-index:2147483645;border:2px solid #70c5ff;background:#55aeef33;border-radius:10px;pointer-events:none;display:none;transition:all .18s}.wi.collapsed .tabs,.wi.collapsed .toolbar,.wi.collapsed .content,.wi.collapsed .status,.wi.collapsed .resize{display:none}.wi.collapsed{height:44px!important;min-height:44px!important;border-radius:10px}.wi.dock-left,.wi.dock-right{border-radius:0}.wi.dock-top,.wi.dock-bottom{border-radius:0}.wi.dock-top .title{order:2;border-top:1px solid var(--line);border-bottom:0}.wi.dock-top .tabs{order:0}.wi.dock-top .toolbar{order:1}.wi.dock-top .content{order:0}.wi.dock-bottom .title{order:0}.wi.dock-bottom .tabs{order:1}.wi.dock-bottom .toolbar{order:2}.wi.dock-bottom .content{order:3}/* Geometry already anchors vertical docks; translating during the height animation hides the title. */.wi.dock-top.collapsed,.wi.dock-bottom.collapsed{transform:none}.wi.dock-left.collapsed{transform:translateX(calc(-100% + 54px))}.wi.dock-right.collapsed{transform:translateX(calc(100% - 54px))}.wi.dock-left.collapsed .title [data-action="collapse"]{order:1}.wi.dock-right.collapsed .title [data-action="collapse"]{order:-1}.dialog{position:absolute;z-index:10;inset:0;background:#0009;display:grid;place-items:center;padding:16px}.dialogbox{width:min(440px,100%);max-height:90%;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;box-shadow:0 15px 55px #000b}.dialogbox h3{margin:0 0 10px}.dialogbox .actions{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}.footerhint{font-size:11px;color:var(--muted)}
+      button{font:inherit;color:inherit;border:1px solid transparent;background:transparent;border-radius:7px;min-width:36px;height:34px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 8px}button:hover{background:#ffffff12;border-color:#ffffff14}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}.icon{font-size:16px;line-height:1}.title button{width:38px;height:38px;font-size:18px}.close:hover{background:#9f3942}.tabs{display:flex;gap:4px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow:auto;scrollbar-width:thin}.tab{white-space:nowrap;color:var(--muted);padding:5px 11px}.tab[aria-selected="true"]{color:var(--text);background:#2d4056;border-color:#47607c}.toolbar{display:flex;align-items:center;gap:4px;min-height:42px;padding:4px 8px;background:#141a23;border-bottom:1px solid var(--line);overflow:auto}.toolbar .spacer{flex:1}.toolbar button{min-width:36px}.content{position:relative;display:flex;flex:1;min-height:0;overflow:hidden}.panel{display:none;flex:1;min-height:0;min-width:0}.panel.active{display:flex}.columns{display:flex;flex:1;min-width:0;min-height:0}.treepane{width:42%;min-width:115px;border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}.detailpane{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}.subhead{padding:6px 9px;color:var(--muted);font-size:11px;letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}.tree,.scroll{overflow:auto;overscroll-behavior:contain;min-height:0;flex:1;padding:6px}.tree{display:grid;grid-template-columns:minmax(max-content,1fr);align-content:start}.tree-row{box-sizing:border-box;height:auto;min-height:25px;display:flex;align-items:center;gap:4px;padding:2px 5px;border-radius:5px;white-space:nowrap;cursor:pointer;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.tree-row:hover{background:#ffffff0a}.tree-row.selected{background:#23507a;color:#fff}.tree-row .twisty{width:18px;min-width:18px;height:22px;padding:0;color:var(--muted)}.tree-row .twisty,.tree-row .tag{flex-shrink:0}.tree-more{justify-self:start;height:28px;margin:4px 2px;color:var(--accent);font-size:12px;border-color:var(--line)}.tree-row .tag{color:#7ec8ff}.tree-row .meta{color:#b3becb}.muted{color:var(--muted)}.empty{padding:18px;color:var(--muted);text-align:center}.field{width:100%;background:#0d1118;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:7px 8px;font:inherit}.field.small{padding:5px 7px}.field,textarea,select{font-size:14px}.editor{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical;min-height:60px;max-height:35%;tab-size:2}.label{font-size:11px;color:var(--muted);margin:9px 0 4px}.detail-actions{display:flex;gap:5px;flex-wrap:wrap;padding:7px;border-bottom:1px solid var(--line)}.htmlview,.sourceview{margin:0;white-space:pre;overflow:auto;flex:1;padding:10px;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;tab-size:2;color:#d7e2ef}.tok-tag{color:#76c7ff}.tok-attr{color:#c6a0f6}.tok-str{color:#a7dc8b}.tok-comment{color:#718096}.tok-text{color:#d7e2ef}.tok-key{color:#f0c674}.tok-num{color:#ef9f76}.tok-punc{color:#b9c5d3}.status{min-height:24px;padding:3px 9px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:center}.status .right{margin-left:auto}.consolepanel{flex-direction:column}.consolelog{flex:1;min-height:0;overflow:auto;padding:5px}.entry{padding:5px 8px;border-bottom:1px solid #ffffff0b;white-space:pre-wrap;overflow-wrap:anywhere}.entry.warn{background:#7d5b1b22}.entry.error{background:#842d3828}.entry.debug{color:#b1a5cf}.entry .stamp{color:#8594a7;font-size:10px;margin-right:7px}.entry .kind{font-weight:700;margin-right:6px}.command-area{border-top:1px solid var(--line);padding:7px;display:flex;gap:7px;align-items:flex-end}.command-area textarea{flex:1;min-height:40px;max-height:125px;resize:vertical;font:13px/1.4 ui-monospace,monospace}.resourcepanel{flex-direction:column}.resource-type{display:flex;padding:6px 8px;gap:4px;border-bottom:1px solid var(--line)}.resource-type button[aria-pressed="true"]{background:#2d4056}.reslist{flex:1;min-height:0;overflow:auto}.resrow{display:grid;grid-template-columns:minmax(90px,1fr) minmax(80px,2fr);gap:8px;padding:7px 9px;border-bottom:1px solid #ffffff0a;cursor:pointer}.resrow:hover{background:#ffffff0a}.resrow.selected{background:#23507a}.reskey,.resvalue{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.reskey{font:12px ui-monospace,monospace;color:#a9d5ff}.resvalue{color:var(--muted)}.filterbox{width:150px}.sourcepanel{flex-direction:column}.sourcebar{display:flex;align-items:center;gap:7px;padding:5px 8px;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted)}.sourceview{flex:1}.sourcebar button[aria-pressed="true"]{background:#2d4056;border-color:#47607c}.menu{position:absolute;z-index:9;width:250px;max-width:calc(100% - 16px);display:flex;flex-direction:column;gap:2px;padding:4px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px #000a}.menu button{height:auto;flex-direction:column;align-items:flex-start;gap:1px;padding:7px 10px;text-align:left}.menu .hint{font-size:11px;color:var(--muted)}.dialogbox.wide{width:min(640px,100%)}.urlgroup{margin-top:10px}.urlgroup-head{display:flex;align-items:center;gap:6px;font-weight:600;font-size:12px}.urllist{max-height:180px;overflow:auto;margin-top:4px;padding:3px;border:1px solid var(--line);border-radius:6px;background:#0d1118}.urlrow{display:flex;gap:6px;align-items:flex-start;padding:2px 4px;font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}.urlrow input,.urlgroup-head input{margin:2px 0 0;flex:none}.exportprogress{margin-top:10px;font-size:12px;color:var(--muted);min-height:1.4em}.notice{background:#573e14;color:#ffe1a3;padding:6px 9px;font-size:11px}.resize{position:absolute;z-index:5;touch-action:none}.resize.e,.resize.w{top:14px;bottom:14px;width:10px;cursor:ew-resize}.resize.e{right:-4px}.resize.w{left:-4px}.resize.n,.resize.s{height:10px;left:14px;right:14px;cursor:ns-resize}.resize.n{top:-4px}.resize.s{bottom:-4px}.resize.ne,.resize.nw,.resize.se,.resize.sw{width:18px;height:18px;z-index:6}.resize.ne{right:-4px;top:-4px;cursor:nesw-resize}.resize.nw{left:-4px;top:-4px;cursor:nwse-resize}.resize.se{right:-4px;bottom:-4px;cursor:nwse-resize}.resize.sw{left:-4px;bottom:-4px;cursor:nesw-resize}.ghost{position:fixed;z-index:2147483645;border:2px solid #70c5ff;background:#55aeef33;border-radius:10px;pointer-events:none;display:none;transition:all .18s}.wi.collapsed .tabs,.wi.collapsed .toolbar,.wi.collapsed .content,.wi.collapsed .status,.wi.collapsed .resize{display:none}.wi.collapsed{height:44px!important;min-height:44px!important;border-radius:10px}.wi.dock-left,.wi.dock-right{border-radius:0}.wi.dock-top,.wi.dock-bottom{border-radius:0}.wi.dock-top .title{order:2;border-top:1px solid var(--line);border-bottom:0}.wi.dock-top .tabs{order:0}.wi.dock-top .toolbar{order:1}.wi.dock-top .content{order:0}.wi.dock-bottom .title{order:0}.wi.dock-bottom .tabs{order:1}.wi.dock-bottom .toolbar{order:2}.wi.dock-bottom .content{order:3}/* Geometry already anchors vertical docks; translating during the height animation hides the title. */.wi.dock-top.collapsed,.wi.dock-bottom.collapsed{transform:none}.wi.dock-left.collapsed{transform:translateX(calc(-100% + 54px))}.wi.dock-right.collapsed{transform:translateX(calc(100% - 54px))}.wi.dock-left.collapsed .title [data-action="collapse"]{order:1}.wi.dock-right.collapsed .title [data-action="collapse"]{order:-1}.dialog{position:absolute;z-index:10;inset:0;background:#0009;display:grid;place-items:center;padding:16px}.dialogbox{width:min(440px,100%);max-height:90%;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;box-shadow:0 15px 55px #000b}.dialogbox h3{margin:0 0 10px}.dialogbox .actions{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}.footerhint{font-size:11px;color:var(--muted)}
       .fa-icon{display:inline-block;width:1em;height:1em;flex:none;fill:currentColor;pointer-events:none}
       .logo .fa-icon{width:14px;height:14px}.tree-row .twisty .fa-icon{width:10px;height:10px}.tree-row .twisty.leaf .fa-icon{width:4px;height:4px}
       .tree-row .hidden-indicator{color:var(--muted);margin-right:4px}
@@ -377,7 +377,7 @@
             </div>
           </div></section>
           <section class="panel consolepanel" data-panel="console"><div class="notice">Page-context console capture is best-effort. Commands run in the page context only after you press Execute.</div><div class="consolelog" id="consolelog" aria-live="polite"></div><div class="command-area"><textarea class="field" id="command" placeholder="JavaScript command — Enter executes, Shift+Enter adds a line" aria-label="JavaScript command"></textarea><button data-action="execute" title="Execute command" aria-label="Execute command">${faIcon('play')}</button></div></section>
-          <section class="panel sourcepanel" data-panel="source"><div class="sourcebar"><span id="source-label">Reconstructed live DOM</span><span class="spacer"></span><button data-action="beautify-source" title="Beautify: indent the HTML one element per line" aria-label="Beautify source" aria-pressed="false">${faIcon('beautify')}</button><button data-action="export-source" title="Export the shown source as a file" aria-label="Export source">${faIcon('download')}</button><button data-action="copy-source" title="Copy source" aria-label="Copy source">${faIcon('copy')}</button><button data-action="refresh-source" title="Refresh source" aria-label="Refresh source">${faIcon('refresh')}</button></div><pre class="sourceview" id="sourceview" tabindex="0"></pre></section>
+          <section class="panel sourcepanel" data-panel="source"><div class="sourcebar"><span id="source-label">Reconstructed live DOM</span><span class="spacer"></span><button data-action="beautify-source" title="Beautify: indent the HTML one element per line" aria-label="Beautify source" aria-pressed="false">${faIcon('beautify')}</button><button data-action="export-source" title="Export the source, or the source with every file it references" aria-label="Export source" aria-haspopup="menu" aria-expanded="false">${faIcon('download')}</button><button data-action="copy-source" title="Copy source" aria-label="Copy source">${faIcon('copy')}</button><button data-action="refresh-source" title="Refresh source" aria-label="Refresh source">${faIcon('refresh')}</button></div><pre class="sourceview" id="sourceview" tabindex="0"></pre></section>
           <section class="panel resourcepanel" data-panel="resources"><div class="resource-type" role="tablist" aria-label="Storage type"><button data-resource="local" aria-pressed="true">Local</button><button data-resource="session" aria-pressed="false">Session</button><button data-resource="cookie" aria-pressed="false">Cookies</button></div><div class="toolbar" style="border-bottom:1px solid var(--line)"><input class="field small filterbox" id="resource-filter" placeholder="Filter resources" aria-label="Filter resources"><span class="spacer"></span><button data-action="resource-copy" title="Copy selected resource" aria-label="Copy selected resource">${faIcon('copy')}</button><button data-action="resource-view" title="View selected value in Source" aria-label="View selected value in Source">${faIcon('file-lines')}</button><button data-action="resource-delete" title="Delete selected resource" aria-label="Delete selected resource">${faIcon('trash')}</button><button data-action="resource-clean" title="Clear this storage category" aria-label="Clear this storage category">${faIcon('broom')}</button><button data-action="resource-refresh" title="Refresh resources" aria-label="Refresh resources">${faIcon('refresh')}</button></div><div class="reslist" id="reslist"></div><div class="status" id="resource-status">Accessible storage for this origin</div></section>
         </main>
         <div class="status"><span id="status-text" aria-live="polite">Ready</span><span class="right" id="status-right">No external requests</span></div>
@@ -476,6 +476,7 @@
     function updateTab(tab, save = true) {
       if (!['elements', 'console', 'source', 'resources'].includes(tab)) return;
       if (state.activeTab === 'source' && tab !== 'source') stateLocal.sourceOverride = null;
+      closeExportMenu();
       state.activeTab = tab;
       root.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
       root.querySelectorAll('[data-panel]').forEach(p => p.classList.toggle('active', p.dataset.panel === tab));
@@ -968,19 +969,227 @@
       const host = (location.hostname || 'page').replace(/[^\w.-]+/g, '_');
       return { text: stateLocal.sourceText || sourceHTML(), name: `${host}${stateLocal.sourceBeautify ? '-formatted' : ''}`, extension: 'html', type: 'text/html' };
     }
+    function safeFilename(name, fallback = 'source') { return String(name).replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '_').slice(0, 100) || fallback; }
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      // The link lives in the inspector's shadow root, so page click handlers
+      // (such as client-side routers) never see it.
+      const link = document.createElement('a'); link.href = url; link.download = filename; link.hidden = true;
+      link.addEventListener('click', e => e.stopPropagation());
+      root.appendChild(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    }
     function exportSource() {
       const { text, name, extension, type } = currentSource();
-      const filename = `${String(name).replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '_').slice(0, 100) || 'source'}.${extension}`;
+      const filename = `${safeFilename(name)}.${extension}`;
+      try { downloadBlob(new Blob([text], { type: `${type};charset=utf-8` }), filename); setStatus(`Exported ${filename}`); }
+      catch (e) { setStatus(`Export failed: ${e.message}`); }
+    }
+
+    // Export menu: "Source" or "All files…".
+    let exportMenu = null;
+    function exportButton() { return root.querySelector('[data-action="export-source"]'); }
+    function closeExportMenu(focusButton = false) {
+      if (!exportMenu) return;
+      exportMenu.remove(); exportMenu = null;
+      const button = exportButton(); button.setAttribute('aria-expanded', 'false');
+      if (focusButton) button.focus();
+    }
+    function toggleExportMenu() {
+      if (exportMenu) return closeExportMenu();
+      const button = exportButton();
+      const menu = document.createElement('div'); menu.className = 'menu'; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'Export');
+      for (const [actionName, label, hint] of [
+        ['export-source-file', 'Source', 'Save the source shown as one file'],
+        ['export-all-files', 'All files…', 'Find every URL in the source and save the files with it as a ZIP'],
+      ]) {
+        const item = document.createElement('button'); item.setAttribute('role', 'menuitem'); item.dataset.action = actionName;
+        const title = document.createElement('span'); title.textContent = label;
+        const sub = document.createElement('span'); sub.className = 'hint'; sub.textContent = hint;
+        item.append(title, sub); menu.appendChild(item);
+      }
+      menu.addEventListener('keydown', e => {
+        const items = [...menu.querySelectorAll('[role="menuitem"]')], index = items.indexOf(root.activeElement);
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); items[(index + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length].focus(); }
+        else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeExportMenu(true); }
+        else if (e.key === 'Tab') closeExportMenu();
+      });
+      win.appendChild(menu); exportMenu = menu;
+      const b = button.getBoundingClientRect(), w = win.getBoundingClientRect();
+      menu.style.top = `${b.bottom - w.top + 4}px`;
+      menu.style.left = `${clamp(b.left - w.left, 8, Math.max(8, w.width - menu.offsetWidth - 8))}px`;
+      button.setAttribute('aria-expanded', 'true');
+      menu.querySelector('[role="menuitem"]').focus();
+    }
+
+    // "All files": find URLs in the source text, fetch the chosen ones with the
+    // page's own fetch (so normal cross-origin rules apply), and save a ZIP.
+    const URL_KINDS = [
+      ['resource', 'Page resources', 'Scripts, styles, images, fonts and media the page loads', true],
+      ['link', 'Linked pages', 'Pages reached by links and forms', false],
+      ['other', 'Other URLs in code', 'Addresses found in scripts, text and other attributes', false],
+    ];
+    const MAX_EXPORT_URLS = 1000, MAX_EXPORT_BYTES = 250 * 1024 * 1024, EXPORT_CONCURRENCY = 4, EXPORT_TIMEOUT = 20000;
+    function decodeEntities(text) { return text.replace(/&(amp|quot|#39|lt|gt|nbsp);/g, (m, e) => ({ amp: '&', quot: '"', '#39': "'", lt: '<', gt: '>', nbsp: ' ' }[e])); }
+    function scanSourceUrls(text) {
+      const rank = { resource: 0, link: 1, other: 2 }, found = new Map();
+      const add = (raw, kind) => {
+        const value = decodeEntities(String(raw || '').trim());
+        if (!value || value.startsWith('#') || /^(data|blob|javascript|mailto|tel|about|sms):/i.test(value)) return;
+        let url; try { url = new URL(value, document.baseURI); } catch (_) { return; }
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+        url.hash = '';
+        const previous = found.get(url.href);
+        if (!previous || rank[kind] < rank[previous.kind]) found.set(url.href, { url: url.href, kind });
+      };
+      const cssUrls = css => {
+        for (const m of css.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)'"\s]+))\s*\)/gi)) add(m[1] ?? m[2] ?? m[3], 'resource');
+        for (const m of css.matchAll(/@import\s+["']([^"']+)["']/gi)) add(m[1], 'resource');
+      };
+      for (const tagMatch of text.matchAll(/<([a-zA-Z][\w:-]*)\b([^>]*)>/g)) {
+        const tag = tagMatch[1].toLowerCase();
+        for (const m of tagMatch[2].matchAll(/([^\s="'\/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g)) {
+          const name = m[1].toLowerCase(), value = m[2] ?? m[3] ?? m[4];
+          if (name === 'srcset' || name === 'imagesrcset') decodeEntities(value).split(',').forEach(part => add(part.trim().split(/\s+/)[0], 'resource'));
+          else if (name === 'src' || name === 'poster' || (name === 'data' && tag === 'object')) add(value, 'resource');
+          else if (name === 'href') add(value, tag === 'link' ? 'resource' : 'link');
+          else if (name === 'action' || name === 'formaction') add(value, 'link');
+          else if (name === 'style') cssUrls(decodeEntities(value));
+        }
+      }
+      cssUrls(text);
+      for (const m of text.matchAll(/https?:\/\/[^\s"'<>`()\\{}|^]+/gi)) add(m[0].replace(/[.,;:!?]+$/, ''), 'other');
+      return [...found.values()];
+    }
+    const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+    function crc32(bytes) { let c = 0xFFFFFFFF; for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+    // Minimal ZIP writer: stored (uncompressed) entries with UTF-8 names.
+    function buildZip(entries) {
+      const encoder = new TextEncoder(), parts = [], central = [];
+      const now = new Date(), time = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+      const date = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+      let offset = 0;
+      for (const entry of entries) {
+        const name = encoder.encode(entry.path), data = typeof entry.data === 'string' ? encoder.encode(entry.data) : entry.data, crc = crc32(data);
+        const local = new DataView(new ArrayBuffer(30));
+        [[0, 0x04034b50, 4], [4, 20, 2], [6, 0x0800, 2], [8, 0, 2], [10, time, 2], [12, date, 2], [14, crc, 4], [18, data.length, 4], [22, data.length, 4], [26, name.length, 2], [28, 0, 2]]
+          .forEach(([at, value, size]) => size === 4 ? local.setUint32(at, value, true) : local.setUint16(at, value, true));
+        parts.push(local.buffer, name, data);
+        const record = new DataView(new ArrayBuffer(46));
+        [[0, 0x02014b50, 4], [4, 20, 2], [6, 20, 2], [8, 0x0800, 2], [10, 0, 2], [12, time, 2], [14, date, 2], [16, crc, 4], [20, data.length, 4], [24, data.length, 4], [28, name.length, 2], [42, offset, 4]]
+          .forEach(([at, value, size]) => size === 4 ? record.setUint32(at, value, true) : record.setUint16(at, value, true));
+        central.push(record.buffer, name);
+        offset += 30 + name.length + data.length;
+      }
+      const centralSize = central.reduce((n, part) => n + part.byteLength, 0), end = new DataView(new ArrayBuffer(22));
+      end.setUint32(0, 0x06054b50, true); end.setUint16(8, entries.length, true); end.setUint16(10, entries.length, true);
+      end.setUint32(12, centralSize, true); end.setUint32(16, offset, true);
+      return new Blob([...parts, ...central, end.buffer], { type: 'application/zip' });
+    }
+    function shortHash(text) { let h = 5381; for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) >>> 0; return h.toString(16); }
+    function zipPathFor(href, used) {
+      const url = new URL(href);
+      const segments = url.pathname.split('/').filter(Boolean).map(seg => {
+        try { seg = decodeURIComponent(seg); } catch (_) {}
+        return seg.replace(/[\\:*?"<>|\u0000-\u001f]+/g, '_').replace(/^\.+$/, '_').slice(0, 120);
+      });
+      if (!segments.length || url.pathname.endsWith('/')) segments.push('index.html');
+      let file = segments.pop();
+      if (url.search) { const dot = file.lastIndexOf('.'), tag = `_${shortHash(url.search)}`; file = dot > 0 ? file.slice(0, dot) + tag + file.slice(dot) : file + tag; }
+      const base = ['files', url.host.replace(/:/g, '_'), ...segments, file].join('/');
+      let path = base;
+      for (let n = 2; used.has(path.toLowerCase()); n++) {
+        const dot = base.lastIndexOf('.'), slash = base.lastIndexOf('/');
+        path = dot > slash ? `${base.slice(0, dot)}-${n}${base.slice(dot)}` : `${base}-${n}`;
+      }
+      used.add(path.toLowerCase());
+      return path;
+    }
+    async function fetchBytes(href, signal) {
+      const controller = new AbortController(), abort = () => controller.abort();
+      const timer = setTimeout(abort, EXPORT_TIMEOUT); signal.addEventListener('abort', abort);
       try {
-        const url = URL.createObjectURL(new Blob([text], { type: `${type};charset=utf-8` }));
-        // The link lives in the inspector's shadow root, so page click handlers
-        // (such as client-side routers) never see it.
-        const link = document.createElement('a'); link.href = url; link.download = filename; link.hidden = true;
-        link.addEventListener('click', e => e.stopPropagation());
-        root.appendChild(link); link.click(); link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 30000);
-        setStatus(`Exported ${filename}`);
-      } catch (e) { setStatus(`Export failed: ${e.message}`); }
+        let response;
+        try { response = await fetch(href, { signal: controller.signal, credentials: 'same-origin' }); }
+        catch (e) { throw new Error(signal.aborted ? 'cancelled' : controller.signal.aborted ? 'timed out' : 'blocked (cross-origin or network error)'); }
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return new Uint8Array(await response.arrayBuffer());
+      } finally { clearTimeout(timer); signal.removeEventListener('abort', abort); }
+    }
+    function openExportAllDialog() {
+      const source = currentSource();
+      const urls = scanSourceUrls(source.text);
+      if (!urls.length) return setStatus('No downloadable URLs found in the source');
+      const shown = urls.slice(0, MAX_EXPORT_URLS);
+      const modal = document.createElement('div'); modal.className = 'dialog';
+      const box = document.createElement('div'); box.className = 'dialogbox wide'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', 'Export all files');
+      const heading = document.createElement('h3'); heading.textContent = 'Export all files';
+      const intro = document.createElement('div'); intro.className = 'footerhint';
+      intro.textContent = `Found ${urls.length} URL${urls.length === 1 ? '' : 's'} in the source${urls.length > shown.length ? ` (showing the first ${shown.length})` : ''}. Checked files are fetched by this page and saved with the source in a ZIP. Files on other sites download only if they allow cross-origin access; anything that fails is listed in download-report.txt.`;
+      box.append(heading, intro);
+      const boxes = [];
+      for (const [kind, label, hint, checked] of URL_KINDS) {
+        const items = shown.filter(u => u.kind === kind);
+        if (!items.length) continue;
+        const group = document.createElement('div'); group.className = 'urlgroup'; group.dataset.kind = kind;
+        const head = document.createElement('label'); head.className = 'urlgroup-head'; head.title = hint;
+        const all = document.createElement('input'); all.type = 'checkbox'; all.checked = checked; all.setAttribute('aria-label', `Select all ${label.toLowerCase()}`);
+        head.append(all, document.createTextNode(`${label} (${items.length})`));
+        const list = document.createElement('div'); list.className = 'urllist';
+        const groupBoxes = items.map(item => {
+          const row = document.createElement('label'); row.className = 'urlrow';
+          const check = document.createElement('input'); check.type = 'checkbox'; check.checked = checked; check.value = item.url;
+          const text = document.createElement('span'); text.textContent = item.url;
+          row.append(check, text); list.appendChild(row); boxes.push(check); return check;
+        });
+        all.addEventListener('change', () => { groupBoxes.forEach(c => { c.checked = all.checked; }); updateCount(); });
+        list.addEventListener('change', () => { const on = groupBoxes.filter(c => c.checked).length; all.checked = on === groupBoxes.length; all.indeterminate = on > 0 && on < groupBoxes.length; updateCount(); });
+        group.append(head, list); box.appendChild(group);
+      }
+      const progress = document.createElement('div'); progress.className = 'exportprogress'; progress.setAttribute('aria-live', 'polite');
+      const actions = document.createElement('div'); actions.className = 'actions';
+      const cancel = document.createElement('button'); cancel.textContent = 'Cancel';
+      const start = document.createElement('button'); start.dataset.exportStart = 'true';
+      actions.append(cancel, start); box.append(progress, actions);
+      modal.appendChild(box); root.querySelector('.content').appendChild(modal);
+      function updateCount() { const n = boxes.filter(c => c.checked).length; start.textContent = n ? `Download ZIP (${n} file${n === 1 ? '' : 's'})` : 'Download ZIP (source only)'; }
+      updateCount();
+      let controller = null;
+      const close = () => { controller?.abort(); modal.remove(); };
+      cancel.addEventListener('click', close);
+      modal.addEventListener('click', e => { if (e.target === modal && !controller) close(); });
+      modal.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); close(); } });
+      start.addEventListener('click', async () => {
+        const chosen = boxes.filter(c => c.checked).map(c => c.value);
+        controller = new AbortController();
+        boxes.forEach(c => { c.disabled = true; }); box.querySelectorAll('.urlgroup-head input').forEach(c => { c.disabled = true; }); start.disabled = true;
+        const used = new Set(), entries = [], report = [];
+        const sourceFile = `${safeFilename(source.name)}.${source.extension}`; used.add(sourceFile.toLowerCase());
+        entries.push({ path: sourceFile, data: source.text });
+        let done = 0, failed = 0, bytes = 0, next = 0;
+        const show = () => { progress.textContent = `Fetched ${done} of ${chosen.length}${failed ? ` · ${failed} failed` : ''}`; setStatus(progress.textContent, 'Fetching files on request'); };
+        show();
+        const worker = async () => {
+          while (next < chosen.length && !controller.signal.aborted) {
+            const href = chosen[next++];
+            try {
+              if (bytes >= MAX_EXPORT_BYTES) throw new Error(`skipped: ZIP size limit (${MAX_EXPORT_BYTES / 1048576} MB) reached`);
+              const data = await fetchBytes(href, controller.signal);
+              bytes += data.length;
+              const path = zipPathFor(href, used); entries.push({ path, data }); report.push(`OK      ${href}\n        -> ${path}`);
+            } catch (e) { failed++; report.push(`FAILED  ${href}\n        ${e.message}`); }
+            done++; show();
+          }
+        };
+        await Promise.all(Array.from({ length: Math.min(EXPORT_CONCURRENCY, chosen.length) }, worker));
+        if (controller.signal.aborted) { setStatus('Export cancelled', 'No external requests'); return; }
+        entries.push({ path: 'download-report.txt', data: `Exported from ${location.href}\n${new Date().toISOString()}\nSource: ${sourceFile}\nFiles: ${chosen.length - failed} saved, ${failed} failed\n\n${report.join('\n')}\n` });
+        const zipName = `${safeFilename(source.name)}-files.zip`;
+        try { downloadBlob(buildZip(entries), zipName); setStatus(`Exported ${zipName}: ${chosen.length - failed} file${chosen.length - failed === 1 ? '' : 's'} saved${failed ? `, ${failed} failed (see download-report.txt)` : ''}`, `Fetched ${chosen.length} file${chosen.length === 1 ? '' : 's'} on request`); }
+        catch (e) { setStatus(`Export failed: ${e.message}`); }
+        modal.remove();
+      });
+      start.focus();
     }
     function updateSourceButtons() {
       const beautify = root.querySelector('[data-action="beautify-source"]');
@@ -1188,7 +1397,9 @@
         case 'clear-console':stateLocal.consoleEntries=[];renderConsole();break;
         case 'clear-history':stateLocal.commandHistory=[];stateLocal.historyIndex=0;safeSave();setStatus('Command history cleared');break;
         case 'beautify-source':if(stateLocal.sourceOverride)break;stateLocal.sourceBeautify=!stateLocal.sourceBeautify;renderSource();setStatus(stateLocal.sourceBeautify?'Source beautified':'Showing source as serialized');break;
-        case 'export-source':exportSource();break;
+        case 'export-source':toggleExportMenu();break;
+        case 'export-source-file':closeExportMenu();exportSource();break;
+        case 'export-all-files':closeExportMenu();openExportAllDialog();break;
         case 'copy-source':copyText(currentSource().text).then(()=>setStatus('Source copied'),()=>setStatus('Clipboard access unavailable'));break;
         case 'refresh-source':stateLocal.sourceOverride=null;renderSource();setStatus('Reconstructed source refreshed');break;
         case 'source-find':findSource();break;
@@ -1280,6 +1491,7 @@
       listen(window,'pointerdown',pickPointerDown,true); listen(window,'pointermove',pickPointerMove,true);
       listen(window,'pointerup',pickPointerUp,true); listen(window,'pointercancel',pickPointerCancel,true);
       listen(window,'click',suppressPickClick,true);
+      listen(window,'pointerdown',e=>{if(!exportMenu)return;const path=e.composedPath();if(path.includes(exportMenu)||path.includes(exportButton()))return;closeExportMenu();},true);
       listen(document,'pointerleave',()=>{if(stateLocal.picking && stateLocal.pickPointerId===null){stateLocal.pickPoint=null;updatePickHighlight();}});
       listen(window,'blur',()=>{if(stateLocal.picking && stateLocal.pickPointerId!==null)cancelPicker();else if(stateLocal.picking){stateLocal.pickPoint=null;updatePickHighlight();}else stateLocal.pickGesture=null;});
       listen('.title','pointerdown',startDrag);
