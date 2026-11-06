@@ -31,6 +31,7 @@ const icons = {
   undo: 'faRotateLeft',
   beautify: 'faWandMagicSparkles',
   download: 'faDownload',
+  gear: 'faGear',
 };
 
 const scriptPath = path.join(__dirname, '..', 'Web Inspector.user.js');

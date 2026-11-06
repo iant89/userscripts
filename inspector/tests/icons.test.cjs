@@ -33,6 +33,7 @@ const definitions = {
   undo: solid.faRotateLeft,
   beautify: solid.faWandMagicSparkles,
   download: solid.faDownload,
+  gear: solid.faGear,
 };
 let browser;
 
@@ -162,6 +163,7 @@ test('controls use labeled, decorative Font Awesome icons with official paths', 
   for (const [tab, label, icon] of [
     ['elements', 'Elements', 'code'], ['console', 'Console', 'terminal'],
     ['source', 'Source', 'file-code'], ['resources', 'Resources', 'database'],
+    ['settings', 'Settings', 'gear'],
   ]) {
     assert.equal(await inspector.getByRole('tab', { name: label, exact: true }).count(), 1);
     assert.equal(await inspector.locator(`[data-tab="${tab}"] svg`).getAttribute('data-icon'), icon);

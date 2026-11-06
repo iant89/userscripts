@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Inspector
 // @namespace    https://github.com/iant89/userscripts
-// @version      0.6.0
+// @version      0.9.0
 // @description  A mobile-friendly, self-contained web inspector for the current page.
 // @match        *://*/*
 // @run-at       document-start
@@ -59,13 +59,16 @@
       if (!['x', 'y', 'width', 'height'].every(k => Number.isFinite(value[k]) && Math.abs(value[k]) <= 1000000)) return null;
       if (value.width <= 0 || value.height <= 0 || !['float', 'left', 'right', 'top', 'bottom'].includes(value.dock)) return null;
       if (typeof value.closed !== 'boolean' || typeof value.collapsed !== 'boolean') return null;
-      if (!['elements', 'console', 'source', 'resources'].includes(value.activeTab) || !['local', 'session', 'cookie'].includes(value.lastResourceType)) return null;
+      if (!['elements', 'console', 'source', 'resources', 'settings'].includes(value.activeTab) || !['local', 'session', 'cookie'].includes(value.lastResourceType)) return null;
       if (!Number.isFinite(value.updatedAt) || value.updatedAt < 0 || value.updatedAt > Date.now() + 86400000) return null;
       return {
         x: value.x, y: value.y, width: value.width, height: value.height, dock: value.dock,
         collapsed: value.collapsed, closed: value.closed, activeTab: value.activeTab,
         theme: 'dark', lastResourceType: value.lastResourceType,
-        opacity: typeof value.opacity === 'boolean' ? value.opacity : true, updatedAt: value.updatedAt,
+        opacity: typeof value.opacity === 'boolean' ? value.opacity : true,
+        rewriteUrls: typeof value.rewriteUrls === 'boolean' ? value.rewriteUrls : false,
+        rewriteScripts: typeof value.rewriteScripts === 'boolean' ? value.rewriteScripts : false,
+        stripQuery: typeof value.stripQuery === 'boolean' ? value.stripQuery : false, updatedAt: value.updatedAt,
       };
     }
     function journalTime(name) {
@@ -270,6 +273,7 @@
     "undo": [512,512,"M24 192l144 0c9.7 0 18.5-5.8 22.2-14.8s1.7-19.3-5.2-26.2l-46.7-46.7c75.3-58.6 184.3-53.3 253.5 15.9 75 75 75 196.5 0 271.5s-196.5 75-271.5 0c-10.2-10.2-19-21.3-26.4-33-9.5-14.9-29.3-19.3-44.2-9.8s-19.3 29.3-9.8 44.2C49.7 408.7 61.4 423.5 75 437 175 537 337 537 437 437S537 175 437 75C342.8-19.3 193.3-24.7 92.7 58.8L41 7C34.1 .2 23.8-1.9 14.8 1.8S0 14.3 0 24L0 168c0 13.3 10.7 24 24 24z"],
     "beautify": [576,512,"M263.4-27L278.2 9.8 315 24.6c3 1.2 5 4.2 5 7.4s-2 6.2-5 7.4L278.2 54.2 263.4 91c-1.2 3-4.2 5-7.4 5s-6.2-2-7.4-5L233.8 54.2 197 39.4c-3-1.2-5-4.2-5-7.4s2-6.2 5-7.4L233.8 9.8 248.6-27c1.2-3 4.2-5 7.4-5s6.2 2 7.4 5zM110.7 41.7l21.5 50.1 50.1 21.5c5.9 2.5 9.7 8.3 9.7 14.7s-3.8 12.2-9.7 14.7l-50.1 21.5-21.5 50.1c-2.5 5.9-8.3 9.7-14.7 9.7s-12.2-3.8-14.7-9.7L59.8 164.2 9.7 142.7C3.8 140.2 0 134.4 0 128s3.8-12.2 9.7-14.7L59.8 91.8 81.3 41.7C83.8 35.8 89.6 32 96 32s12.2 3.8 14.7 9.7zM464 304c6.4 0 12.2 3.8 14.7 9.7l21.5 50.1 50.1 21.5c5.9 2.5 9.7 8.3 9.7 14.7s-3.8 12.2-9.7 14.7l-50.1 21.5-21.5 50.1c-2.5 5.9-8.3 9.7-14.7 9.7s-12.2-3.8-14.7-9.7l-21.5-50.1-50.1-21.5c-5.9-2.5-9.7-8.3-9.7-14.7s3.8-12.2 9.7-14.7l50.1-21.5 21.5-50.1c2.5-5.9 8.3-9.7 14.7-9.7zM460 0c11 0 21.6 4.4 29.5 12.2l42.3 42.3C539.6 62.4 544 73 544 84s-4.4 21.6-12.2 29.5l-88.2 88.2-101.3-101.3 88.2-88.2C438.4 4.4 449 0 460 0zM44.2 398.5L308.4 134.3 409.7 235.6 145.5 499.8C137.6 507.6 127 512 116 512s-21.6-4.4-29.5-12.2L44.2 457.5C36.4 449.6 32 439 32 428s4.4-21.6 12.2-29.5z"],
     "download": [448,512,"M256 32c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 210.7-41.4-41.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l96 96c12.5 12.5 32.8 12.5 45.3 0l96-96c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L256 242.7 256 32zM64 320c-35.3 0-64 28.7-64 64l0 32c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-32c0-35.3-28.7-64-64-64l-46.9 0-56.6 56.6c-31.2 31.2-81.9 31.2-113.1 0L110.9 320 64 320zm304 56a24 24 0 1 1 0 48 24 24 0 1 1 0-48z"],
+    "gear": [512,512,"M195.1 9.5C198.1-5.3 211.2-16 226.4-16l59.8 0c15.2 0 28.3 10.7 31.3 25.5L332 79.5c14.1 6 27.3 13.7 39.3 22.8l67.8-22.5c14.4-4.8 30.2 1.2 37.8 14.4l29.9 51.8c7.6 13.2 4.9 29.8-6.5 39.9L447 233.3c.9 7.4 1.3 15 1.3 22.7s-.5 15.3-1.3 22.7l53.4 47.5c11.4 10.1 14 26.8 6.5 39.9l-29.9 51.8c-7.6 13.1-23.4 19.2-37.8 14.4l-67.8-22.5c-12.1 9.1-25.3 16.7-39.3 22.8l-14.4 69.9c-3.1 14.9-16.2 25.5-31.3 25.5l-59.8 0c-15.2 0-28.3-10.7-31.3-25.5l-14.4-69.9c-14.1-6-27.2-13.7-39.3-22.8L73.5 432.3c-14.4 4.8-30.2-1.2-37.8-14.4L5.8 366.1c-7.6-13.2-4.9-29.8 6.5-39.9l53.4-47.5c-.9-7.4-1.3-15-1.3-22.7s.5-15.3 1.3-22.7L12.3 185.8c-11.4-10.1-14-26.8-6.5-39.9L35.7 94.1c7.6-13.2 23.4-19.2 37.8-14.4l67.8 22.5c12.1-9.1 25.3-16.7 39.3-22.8L195.1 9.5zM256.3 336a80 80 0 1 0 -.6-160 80 80 0 1 0 .6 160z"],
   };
   // END GENERATED FONT AWESOME DATA
   function faIcon(name) {
@@ -285,6 +289,7 @@
   const defaultState = {
     x: 18, y: 70, width: 720, height: 520, dock: 'float', collapsed: false, closed: false,
     activeTab: 'elements', theme: 'dark', lastResourceType: 'local', opacity: true,
+    rewriteUrls: false, rewriteScripts: false, stripQuery: false,
   };
   const executionWindow = options.pageWindow || window;
   const executionTarget = options.isolated ? 'userscript' : 'page';
@@ -299,8 +304,8 @@
       if (Number.isFinite(value[key]) && Math.abs(value[key]) <= 1000000 && (!['width', 'height'].includes(key) || value[key] > 0)) result[key] = value[key];
     }
     if (['float', 'left', 'right', 'top', 'bottom'].includes(value.dock)) result.dock = value.dock;
-    for (const key of ['collapsed', 'closed', 'opacity']) if (typeof value[key] === 'boolean') result[key] = value[key];
-    if (['elements', 'console', 'source', 'resources'].includes(value.activeTab)) result.activeTab = value.activeTab;
+    for (const key of ['collapsed', 'closed', 'opacity', 'rewriteUrls', 'rewriteScripts', 'stripQuery']) if (typeof value[key] === 'boolean') result[key] = value[key];
+    if (['elements', 'console', 'source', 'resources', 'settings'].includes(value.activeTab)) result.activeTab = value.activeTab;
     if (['local', 'session', 'cookie'].includes(value.lastResourceType)) result.lastResourceType = value.lastResourceType;
     if (value.theme === 'dark') result.theme = value.theme;
     if (Number.isFinite(value.updatedAt) && value.updatedAt >= 0 && value.updatedAt <= Date.now() + 86400000) result.updatedAt = value.updatedAt;
@@ -341,7 +346,7 @@
       .wi.idle{opacity:.76}.wi.dragging,.wi.resizing{transition:none;opacity:1}.wi.closed{display:none}
       .title{height:44px;min-height:44px;display:flex;align-items:center;gap:8px;padding:0 8px 0 12px;background:linear-gradient(110deg,#26364b,#1c2634);border-bottom:1px solid var(--line);touch-action:none;user-select:none;cursor:grab}
       .title:active{cursor:grabbing}.brand{display:flex;align-items:center;gap:8px;min-width:0;flex:1}.logo{width:24px;height:24px;border-radius:7px;background:#388bd0;display:grid;place-items:center;font-weight:800;color:white}.titletext{font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.context{color:var(--muted);font-size:11px;margin-left:3px}
-      button{font:inherit;color:inherit;border:1px solid transparent;background:transparent;border-radius:7px;min-width:36px;height:34px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 8px}button:hover{background:#ffffff12;border-color:#ffffff14}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}.icon{font-size:16px;line-height:1}.title button{width:38px;height:38px;font-size:18px}.close:hover{background:#9f3942}.tabs{display:flex;gap:4px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow:auto;scrollbar-width:thin}.tab{white-space:nowrap;color:var(--muted);padding:5px 11px}.tab[aria-selected="true"]{color:var(--text);background:#2d4056;border-color:#47607c}.toolbar{display:flex;align-items:center;gap:4px;min-height:42px;padding:4px 8px;background:#141a23;border-bottom:1px solid var(--line);overflow:auto}.toolbar .spacer{flex:1}.toolbar button{min-width:36px}.content{position:relative;display:flex;flex:1;min-height:0;overflow:hidden}.panel{display:none;flex:1;min-height:0;min-width:0}.panel.active{display:flex}.columns{display:flex;flex:1;min-width:0;min-height:0}.treepane{width:42%;min-width:115px;border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}.detailpane{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}.subhead{padding:6px 9px;color:var(--muted);font-size:11px;letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}.tree,.scroll{overflow:auto;overscroll-behavior:contain;min-height:0;flex:1;padding:6px}.tree{display:grid;grid-template-columns:minmax(max-content,1fr);align-content:start}.tree-row{box-sizing:border-box;height:auto;min-height:25px;display:flex;align-items:center;gap:4px;padding:2px 5px;border-radius:5px;white-space:nowrap;cursor:pointer;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.tree-row:hover{background:#ffffff0a}.tree-row.selected{background:#23507a;color:#fff}.tree-row .twisty{width:18px;min-width:18px;height:22px;padding:0;color:var(--muted)}.tree-row .twisty,.tree-row .tag{flex-shrink:0}.tree-more{justify-self:start;height:28px;margin:4px 2px;color:var(--accent);font-size:12px;border-color:var(--line)}.tree-row .tag{color:#7ec8ff}.tree-row .meta{color:#b3becb}.muted{color:var(--muted)}.empty{padding:18px;color:var(--muted);text-align:center}.field{width:100%;background:#0d1118;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:7px 8px;font:inherit}.field.small{padding:5px 7px}.field,textarea,select{font-size:14px}.editor{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical;min-height:60px;max-height:35%;tab-size:2}.label{font-size:11px;color:var(--muted);margin:9px 0 4px}.detail-actions{display:flex;gap:5px;flex-wrap:wrap;padding:7px;border-bottom:1px solid var(--line)}.htmlview,.sourceview{margin:0;white-space:pre;overflow:auto;flex:1;padding:10px;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;tab-size:2;color:#d7e2ef}.tok-tag{color:#76c7ff}.tok-attr{color:#c6a0f6}.tok-str{color:#a7dc8b}.tok-comment{color:#718096}.tok-text{color:#d7e2ef}.tok-key{color:#f0c674}.tok-num{color:#ef9f76}.tok-punc{color:#b9c5d3}.status{min-height:24px;padding:3px 9px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:center}.status .right{margin-left:auto}.consolepanel{flex-direction:column}.consolelog{flex:1;min-height:0;overflow:auto;padding:5px}.entry{padding:5px 8px;border-bottom:1px solid #ffffff0b;white-space:pre-wrap;overflow-wrap:anywhere}.entry.warn{background:#7d5b1b22}.entry.error{background:#842d3828}.entry.debug{color:#b1a5cf}.entry .stamp{color:#8594a7;font-size:10px;margin-right:7px}.entry .kind{font-weight:700;margin-right:6px}.command-area{border-top:1px solid var(--line);padding:7px;display:flex;gap:7px;align-items:flex-end}.command-area textarea{flex:1;min-height:40px;max-height:125px;resize:vertical;font:13px/1.4 ui-monospace,monospace}.resourcepanel{flex-direction:column}.resource-type{display:flex;padding:6px 8px;gap:4px;border-bottom:1px solid var(--line)}.resource-type button[aria-pressed="true"]{background:#2d4056}.reslist{flex:1;min-height:0;overflow:auto}.resrow{display:grid;grid-template-columns:minmax(90px,1fr) minmax(80px,2fr);gap:8px;padding:7px 9px;border-bottom:1px solid #ffffff0a;cursor:pointer}.resrow:hover{background:#ffffff0a}.resrow.selected{background:#23507a}.reskey,.resvalue{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.reskey{font:12px ui-monospace,monospace;color:#a9d5ff}.resvalue{color:var(--muted)}.filterbox{width:150px}.sourcepanel{flex-direction:column}.sourcebar{display:flex;align-items:center;gap:7px;padding:5px 8px;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted)}.sourceview{flex:1}.sourcebar button[aria-pressed="true"]{background:#2d4056;border-color:#47607c}.menu{position:absolute;z-index:9;width:250px;max-width:calc(100% - 16px);display:flex;flex-direction:column;gap:2px;padding:4px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px #000a}.menu button{height:auto;flex-direction:column;align-items:flex-start;gap:1px;padding:7px 10px;text-align:left}.menu .hint{font-size:11px;color:var(--muted)}.dialogbox.wide{width:min(640px,100%)}.urlgroup{margin-top:10px}.urlgroup-head{display:flex;align-items:center;gap:6px;font-weight:600;font-size:12px}.urllist{max-height:180px;overflow:auto;margin-top:4px;padding:3px;border:1px solid var(--line);border-radius:6px;background:#0d1118}.urlrow{display:flex;gap:6px;align-items:flex-start;padding:2px 4px;font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}.urlrow input,.urlgroup-head input{margin:2px 0 0;flex:none}.exportprogress{margin-top:10px;font-size:12px;color:var(--muted);min-height:1.4em}.notice{background:#573e14;color:#ffe1a3;padding:6px 9px;font-size:11px}.resize{position:absolute;z-index:5;touch-action:none}.resize.e,.resize.w{top:14px;bottom:14px;width:10px;cursor:ew-resize}.resize.e{right:-4px}.resize.w{left:-4px}.resize.n,.resize.s{height:10px;left:14px;right:14px;cursor:ns-resize}.resize.n{top:-4px}.resize.s{bottom:-4px}.resize.ne,.resize.nw,.resize.se,.resize.sw{width:18px;height:18px;z-index:6}.resize.ne{right:-4px;top:-4px;cursor:nesw-resize}.resize.nw{left:-4px;top:-4px;cursor:nwse-resize}.resize.se{right:-4px;bottom:-4px;cursor:nwse-resize}.resize.sw{left:-4px;bottom:-4px;cursor:nesw-resize}.ghost{position:fixed;z-index:2147483645;border:2px solid #70c5ff;background:#55aeef33;border-radius:10px;pointer-events:none;display:none;transition:all .18s}.wi.collapsed .tabs,.wi.collapsed .toolbar,.wi.collapsed .content,.wi.collapsed .status,.wi.collapsed .resize{display:none}.wi.collapsed{height:44px!important;min-height:44px!important;border-radius:10px}.wi.dock-left,.wi.dock-right{border-radius:0}.wi.dock-top,.wi.dock-bottom{border-radius:0}.wi.dock-top .title{order:2;border-top:1px solid var(--line);border-bottom:0}.wi.dock-top .tabs{order:0}.wi.dock-top .toolbar{order:1}.wi.dock-top .content{order:0}.wi.dock-bottom .title{order:0}.wi.dock-bottom .tabs{order:1}.wi.dock-bottom .toolbar{order:2}.wi.dock-bottom .content{order:3}/* Geometry already anchors vertical docks; translating during the height animation hides the title. */.wi.dock-top.collapsed,.wi.dock-bottom.collapsed{transform:none}.wi.dock-left.collapsed{transform:translateX(calc(-100% + 54px))}.wi.dock-right.collapsed{transform:translateX(calc(100% - 54px))}.wi.dock-left.collapsed .title [data-action="collapse"]{order:1}.wi.dock-right.collapsed .title [data-action="collapse"]{order:-1}.dialog{position:absolute;z-index:10;inset:0;background:#0009;display:grid;place-items:center;padding:16px}.dialogbox{width:min(440px,100%);max-height:90%;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;box-shadow:0 15px 55px #000b}.dialogbox h3{margin:0 0 10px}.dialogbox .actions{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}.footerhint{font-size:11px;color:var(--muted)}
+      button{font:inherit;color:inherit;border:1px solid transparent;background:transparent;border-radius:7px;min-width:36px;height:34px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 8px}button:hover{background:#ffffff12;border-color:#ffffff14}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}.icon{font-size:16px;line-height:1}.title button{width:38px;height:38px;font-size:18px}.close:hover{background:#9f3942}.tabs{display:flex;gap:4px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow:auto;scrollbar-width:thin}.tab{white-space:nowrap;color:var(--muted);padding:5px 11px}.tab[aria-selected="true"]{color:var(--text);background:#2d4056;border-color:#47607c}.toolbar{display:flex;align-items:center;gap:4px;min-height:42px;padding:4px 8px;background:#141a23;border-bottom:1px solid var(--line);overflow:auto}.toolbar .spacer{flex:1}.toolbar button{min-width:36px}.content{position:relative;display:flex;flex:1;min-height:0;overflow:hidden}.panel{display:none;flex:1;min-height:0;min-width:0}.panel.active{display:flex}.columns{display:flex;flex:1;min-width:0;min-height:0}.treepane{width:42%;min-width:115px;border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}.detailpane{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}.subhead{padding:6px 9px;color:var(--muted);font-size:11px;letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}.tree,.scroll{overflow:auto;overscroll-behavior:contain;min-height:0;flex:1;padding:6px}.tree{display:grid;grid-template-columns:minmax(max-content,1fr);align-content:start}.tree-row{box-sizing:border-box;height:auto;min-height:25px;display:flex;align-items:center;gap:4px;padding:2px 5px;border-radius:5px;white-space:nowrap;cursor:pointer;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.tree-row:hover{background:#ffffff0a}.tree-row.selected{background:#23507a;color:#fff}.tree-row .twisty{width:18px;min-width:18px;height:22px;padding:0;color:var(--muted)}.tree-row .twisty,.tree-row .tag{flex-shrink:0}.tree-more{justify-self:start;height:28px;margin:4px 2px;color:var(--accent);font-size:12px;border-color:var(--line)}.tree-row .tag{color:#7ec8ff}.tree-row .meta{color:#b3becb}.muted{color:var(--muted)}.empty{padding:18px;color:var(--muted);text-align:center}.field{width:100%;background:#0d1118;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:7px 8px;font:inherit}.field.small{padding:5px 7px}.field,textarea,select{font-size:14px}.editor{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical;min-height:60px;max-height:35%;tab-size:2}.label{font-size:11px;color:var(--muted);margin:9px 0 4px}.detail-actions{display:flex;gap:5px;flex-wrap:wrap;padding:7px;border-bottom:1px solid var(--line)}.htmlview,.sourceview{margin:0;white-space:pre;overflow:auto;flex:1;padding:10px;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;tab-size:2;color:#d7e2ef}.tok-tag{color:#76c7ff}.tok-attr{color:#c6a0f6}.tok-str{color:#a7dc8b}.tok-comment{color:#718096}.tok-text{color:#d7e2ef}.tok-key{color:#f0c674}.tok-num{color:#ef9f76}.tok-punc{color:#b9c5d3}.status{min-height:24px;padding:3px 9px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:center}.status .right{margin-left:auto}.consolepanel{flex-direction:column}.consolelog{flex:1;min-height:0;overflow:auto;padding:5px}.entry{padding:5px 8px;border-bottom:1px solid #ffffff0b;white-space:pre-wrap;overflow-wrap:anywhere}.entry.warn{background:#7d5b1b22}.entry.error{background:#842d3828}.entry.debug{color:#b1a5cf}.entry .stamp{color:#8594a7;font-size:10px;margin-right:7px}.entry .kind{font-weight:700;margin-right:6px}.command-area{border-top:1px solid var(--line);padding:7px;display:flex;gap:7px;align-items:flex-end}.command-area textarea{flex:1;min-height:40px;max-height:125px;resize:vertical;font:13px/1.4 ui-monospace,monospace}.resourcepanel{flex-direction:column}.resource-type{display:flex;padding:6px 8px;gap:4px;border-bottom:1px solid var(--line)}.resource-type button[aria-pressed="true"]{background:#2d4056}.reslist{flex:1;min-height:0;overflow:auto}.resrow{display:grid;grid-template-columns:minmax(90px,1fr) minmax(80px,2fr);gap:8px;padding:7px 9px;border-bottom:1px solid #ffffff0a;cursor:pointer}.resrow:hover{background:#ffffff0a}.resrow.selected{background:#23507a}.reskey,.resvalue{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.reskey{font:12px ui-monospace,monospace;color:#a9d5ff}.resvalue{color:var(--muted)}.filterbox{width:150px}.sourcepanel{flex-direction:column}.sourcebar{display:flex;align-items:center;gap:7px;padding:5px 8px;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted)}.sourceview{flex:1}.sourcebar button[aria-pressed="true"]{background:#2d4056;border-color:#47607c}.menu{position:absolute;z-index:9;width:250px;max-width:calc(100% - 16px);display:flex;flex-direction:column;gap:2px;padding:4px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px #000a}.menu button{height:auto;flex-direction:column;align-items:flex-start;gap:1px;padding:7px 10px;text-align:left}.menu .hint{font-size:11px;color:var(--muted)}.dialogbox.wide{width:min(640px,100%)}.dialogbox.wide .actions{position:sticky;bottom:-14px;margin:12px -14px -14px;padding:10px 14px;background:var(--panel);border-top:1px solid var(--line)}.urlgroup{margin-top:10px}.urlgroup-head{display:flex;align-items:center;gap:6px;font-weight:600;font-size:12px}.urllist{max-height:180px;overflow:auto;margin-top:4px;padding:3px;border:1px solid var(--line);border-radius:6px;background:#0d1118}.urlrow{display:flex;gap:6px;align-items:flex-start;padding:2px 4px;font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}.urlrow input,.urlgroup-head input{margin:2px 0 0;flex:none}.urlinfo{color:var(--muted);font-size:10.5px}.urlnotes summary{cursor:pointer;font-weight:600;font-size:12px}.urlnotes .urlrow{color:var(--muted)}.exportprogress{margin-top:10px;font-size:12px;color:var(--muted);min-height:1.4em}.settingspanel{flex-direction:column}.settings{display:flex;flex-direction:column;gap:8px;padding:12px}.settings-head{margin:0 0 2px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}.setting{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer}.setting:hover{border-color:#47607c}.setting input{margin:3px 0 0;flex:none;width:16px;height:16px;accent-color:var(--accent)}.setting .hint{display:block;margin-top:3px;font-size:12px;color:var(--muted)}.notice{background:#573e14;color:#ffe1a3;padding:6px 9px;font-size:11px}.resize{position:absolute;z-index:5;touch-action:none}.resize.e,.resize.w{top:14px;bottom:14px;width:10px;cursor:ew-resize}.resize.e{right:-4px}.resize.w{left:-4px}.resize.n,.resize.s{height:10px;left:14px;right:14px;cursor:ns-resize}.resize.n{top:-4px}.resize.s{bottom:-4px}.resize.ne,.resize.nw,.resize.se,.resize.sw{width:18px;height:18px;z-index:6}.resize.ne{right:-4px;top:-4px;cursor:nesw-resize}.resize.nw{left:-4px;top:-4px;cursor:nwse-resize}.resize.se{right:-4px;bottom:-4px;cursor:nwse-resize}.resize.sw{left:-4px;bottom:-4px;cursor:nesw-resize}.ghost{position:fixed;z-index:2147483645;border:2px solid #70c5ff;background:#55aeef33;border-radius:10px;pointer-events:none;display:none;transition:all .18s}.wi.collapsed .tabs,.wi.collapsed .toolbar,.wi.collapsed .content,.wi.collapsed .status,.wi.collapsed .resize{display:none}.wi.collapsed{height:44px!important;min-height:44px!important;border-radius:10px}.wi.dock-left,.wi.dock-right{border-radius:0}.wi.dock-top,.wi.dock-bottom{border-radius:0}.wi.dock-top .title{order:2;border-top:1px solid var(--line);border-bottom:0}.wi.dock-top .tabs{order:0}.wi.dock-top .toolbar{order:1}.wi.dock-top .content{order:0}.wi.dock-bottom .title{order:0}.wi.dock-bottom .tabs{order:1}.wi.dock-bottom .toolbar{order:2}.wi.dock-bottom .content{order:3}/* Geometry already anchors vertical docks; translating during the height animation hides the title. */.wi.dock-top.collapsed,.wi.dock-bottom.collapsed{transform:none}.wi.dock-left.collapsed{transform:translateX(calc(-100% + 54px))}.wi.dock-right.collapsed{transform:translateX(calc(100% - 54px))}.wi.dock-left.collapsed .title [data-action="collapse"]{order:1}.wi.dock-right.collapsed .title [data-action="collapse"]{order:-1}.dialog{position:absolute;z-index:10;inset:0;background:#0009;display:grid;place-items:center;padding:16px}.dialogbox{width:min(440px,100%);max-height:90%;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;box-shadow:0 15px 55px #000b}.dialogbox h3{margin:0 0 10px}.dialogbox .actions{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}.footerhint{font-size:11px;color:var(--muted)}
       .fa-icon{display:inline-block;width:1em;height:1em;flex:none;fill:currentColor;pointer-events:none}
       .logo .fa-icon{width:14px;height:14px}.tree-row .twisty .fa-icon{width:10px;height:10px}.tree-row .twisty.leaf .fa-icon{width:4px;height:4px}
       .tree-row .hidden-indicator{color:var(--muted);margin-right:4px}
@@ -367,6 +372,7 @@
           <button class="tab" role="tab" data-tab="console" aria-selected="false">${faIcon('terminal')} Console</button>
           <button class="tab" role="tab" data-tab="source" aria-selected="false">${faIcon('file-code')} Source</button>
           <button class="tab" role="tab" data-tab="resources" aria-selected="false">${faIcon('database')} Resources</button>
+          <button class="tab" role="tab" data-tab="settings" aria-selected="false">${faIcon('gear')} Settings</button>
         </nav>
         <div class="toolbar" id="toolbar"></div>
         <main class="content">
@@ -379,6 +385,13 @@
           <section class="panel consolepanel" data-panel="console"><div class="notice">Page-context console capture is best-effort. Commands run in the page context only after you press Execute.</div><div class="consolelog" id="consolelog" aria-live="polite"></div><div class="command-area"><textarea class="field" id="command" placeholder="JavaScript command — Enter executes, Shift+Enter adds a line" aria-label="JavaScript command"></textarea><button data-action="execute" title="Execute command" aria-label="Execute command">${faIcon('play')}</button></div></section>
           <section class="panel sourcepanel" data-panel="source"><div class="sourcebar"><span id="source-label">Reconstructed live DOM</span><span class="spacer"></span><button data-action="beautify-source" title="Beautify: indent the HTML one element per line" aria-label="Beautify source" aria-pressed="false">${faIcon('beautify')}</button><button data-action="export-source" title="Export the source, or the source with every file it references" aria-label="Export source" aria-haspopup="menu" aria-expanded="false">${faIcon('download')}</button><button data-action="copy-source" title="Copy source" aria-label="Copy source">${faIcon('copy')}</button><button data-action="refresh-source" title="Refresh source" aria-label="Refresh source">${faIcon('refresh')}</button></div><pre class="sourceview" id="sourceview" tabindex="0"></pre></section>
           <section class="panel resourcepanel" data-panel="resources"><div class="resource-type" role="tablist" aria-label="Storage type"><button data-resource="local" aria-pressed="true">Local</button><button data-resource="session" aria-pressed="false">Session</button><button data-resource="cookie" aria-pressed="false">Cookies</button></div><div class="toolbar" style="border-bottom:1px solid var(--line)"><input class="field small filterbox" id="resource-filter" placeholder="Filter resources" aria-label="Filter resources"><span class="spacer"></span><button data-action="resource-copy" title="Copy selected resource" aria-label="Copy selected resource">${faIcon('copy')}</button><button data-action="resource-view" title="View selected value in Source" aria-label="View selected value in Source">${faIcon('file-lines')}</button><button data-action="resource-delete" title="Delete selected resource" aria-label="Delete selected resource">${faIcon('trash')}</button><button data-action="resource-clean" title="Clear this storage category" aria-label="Clear this storage category">${faIcon('broom')}</button><button data-action="resource-refresh" title="Refresh resources" aria-label="Refresh resources">${faIcon('refresh')}</button></div><div class="reslist" id="reslist"></div><div class="status" id="resource-status">Accessible storage for this origin</div></section>
+          <section class="panel settingspanel" data-panel="settings"><div class="scroll settings">
+            <h4 class="settings-head">All files export</h4>
+            <label class="setting"><input type="checkbox" data-setting="rewriteUrls"><span><strong>Rewrite URLs to the saved copies</strong><span class="hint">In the ZIP, links in the saved page and its stylesheets point to the downloaded files, so the page opens offline. Links to files that weren't saved are made absolute so they still work online.</span></span></label>
+            <label class="setting"><input type="checkbox" data-setting="rewriteScripts"><span><strong>Rewrite URLs in scripts</strong><span class="hint">Also point URLs inside the page's inline scripts and saved .js files at the downloaded files, including URLs built in code whose value was resolved. Only URLs of saved files are changed; other strings are left alone. Paths are relative to the saved page, where scripts resolve them.</span></span></label>
+            <label class="setting"><input type="checkbox" data-setting="stripQuery"><span><strong>Remove variables from saved URLs</strong><span class="hint">Save files without the query part of their URL: data.json?v=2&amp;token=abc is saved as data.json, and rewritten links use that name. Files are still downloaded from the full URL.</span></span></label>
+            <div class="footerhint">Settings are saved with the inspector's window preferences.</div>
+          </div></section>
         </main>
         <div class="status"><span id="status-text" aria-live="polite">Ready</span><span class="right" id="status-right">No external requests</span></div>
         <div class="resize n" data-resize="n"></div><div class="resize s" data-resize="s"></div><div class="resize e" data-resize="e"></div><div class="resize w" data-resize="w"></div><div class="resize ne" data-resize="ne"></div><div class="resize nw" data-resize="nw"></div><div class="resize se" data-resize="se"></div><div class="resize sw" data-resize="sw"></div>
@@ -413,6 +426,7 @@
         x: state.x, y: state.y, width: state.width, height: state.height, dock: state.dock,
         collapsed: !!state.collapsed, closed: !!state.closed, activeTab: state.activeTab,
         theme: state.theme, lastResourceType: stateLocal.resourceType, opacity: !!state.opacity,
+        rewriteUrls: !!state.rewriteUrls, rewriteScripts: !!state.rewriteScripts, stripQuery: !!state.stripQuery,
       };
     }
     let lastSavedValues = JSON.stringify(preferenceValues());
@@ -474,7 +488,7 @@
       updateCollapseState();
     }
     function updateTab(tab, save = true) {
-      if (!['elements', 'console', 'source', 'resources'].includes(tab)) return;
+      if (!['elements', 'console', 'source', 'resources', 'settings'].includes(tab)) return;
       if (state.activeTab === 'source' && tab !== 'source') stateLocal.sourceOverride = null;
       closeExportMenu();
       state.activeTab = tab;
@@ -485,13 +499,16 @@
       if (tab === 'resources') refreshResources();
       if (tab === 'elements') renderTree();
       if (tab === 'console') renderConsole();
+      if (tab === 'settings') renderSettings();
       if (save) safeSave();
     }
+    function renderSettings() { root.querySelectorAll('[data-setting]').forEach(box => { box.checked = !!state[box.dataset.setting]; }); }
     function buildToolbar() {
       const tab = state.activeTab;
       if (tab === 'elements') toolbar.innerHTML = `<input class="field small" id="element-filter" style="width:min(230px,55vw)" placeholder="Search elements…" aria-label="Search elements"><button data-action="search-elements" title="Search elements" aria-label="Search elements">${faIcon('search')}</button><button data-action="search-next" title="Next search result" aria-label="Next result">${faIcon('down')}</button><button data-action="search-prev" title="Previous search result" aria-label="Previous result">${faIcon('up')}</button><span class="spacer"></span>${stateLocal.removed ? `<button data-action="undo-delete" title="Undo most recent deletion" aria-label="Undo deletion">${faIcon('undo')} Undo</button>` : ''}<button data-action="pick" title="Click or drag to pick a target on the page" aria-label="Pick target on page">${faIcon('pick')} Pick</button>`;
       else if (tab === 'console') toolbar.innerHTML = `<span class="muted">Execution target: ${executionTarget === 'page' ? 'current page' : 'userscript context (page globals unavailable)'}</span><span class="spacer"></span><button data-action="clear-console" title="Clear console output" aria-label="Clear console output">Clear</button><button data-action="clear-history" title="Clear command history" aria-label="Clear command history">History</button>`;
       else if (tab === 'source') toolbar.innerHTML = `<span class="muted">Read-only representation</span><span class="spacer"></span><input class="field small" id="source-search" style="width:min(180px,45vw)" placeholder="Find in source" aria-label="Find in source"><button data-action="source-find" title="Find in source" aria-label="Find in source">${faIcon('search')}</button><button data-action="copy-source" title="Copy source" aria-label="Copy source">${faIcon('copy')} Copy</button>`;
+      else if (tab === 'settings') toolbar.innerHTML = `<span class="muted">Inspector settings</span><span class="spacer"></span>`;
       else toolbar.innerHTML = `<span class="muted">Accessible page storage</span><span class="spacer"></span>`;
       // Rebuilding the toolbar must not discard a query the user has typed.
       const elementFilter = toolbar.querySelector('#element-filter'); if (elementFilter) elementFilter.value = stateLocal.elementSearch;
@@ -1024,42 +1041,244 @@
 
     // "All files": find URLs in the source text, fetch the chosen ones with the
     // page's own fetch (so normal cross-origin rules apply), and save a ZIP.
+    // URL groups in the "All files" dialog: [kind, label, hint, checked by default].
     const URL_KINDS = [
       ['resource', 'Page resources', 'Scripts, styles, images, fonts and media the page loads', true],
-      ['link', 'Linked pages', 'Pages reached by links and forms', false],
-      ['other', 'Other URLs in code', 'Addresses found in scripts, text and other attributes', false],
+      ['link', 'Linked pages', 'Pages reached by links and GET forms', false],
+      ['other', 'Other files in code', 'File URLs (a file name with an extension) found in scripts, text and other attributes', false],
+      ['dynamic', 'Built in code', 'URLs assembled by script expressions, with the value they were resolved to', false],
     ];
+    const KIND_RANK = { resource: 0, link: 1, dynamic: 2, other: 3 };
+    const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'CONNECT', 'TRACE']);
     const MAX_EXPORT_URLS = 1000, MAX_EXPORT_BYTES = 250 * 1024 * 1024, EXPORT_CONCURRENCY = 4, EXPORT_TIMEOUT = 20000;
-    function decodeEntities(text) { return text.replace(/&(amp|quot|#39|lt|gt|nbsp);/g, (m, e) => ({ amp: '&', quot: '"', '#39': "'", lt: '<', gt: '>', nbsp: ' ' }[e])); }
-    function scanSourceUrls(text) {
-      const rank = { resource: 0, link: 1, other: 2 }, found = new Map();
-      const add = (raw, kind) => {
-        const value = decodeEntities(String(raw || '').trim());
-        if (!value || value.startsWith('#') || /^(data|blob|javascript|mailto|tel|about|sms):/i.test(value)) return;
-        let url; try { url = new URL(value, document.baseURI); } catch (_) { return; }
-        if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
-        url.hash = '';
-        const previous = found.get(url.href);
-        if (!previous || rank[kind] < rank[previous.kind]) found.set(url.href, { url: url.href, kind });
-      };
-      const cssUrls = css => {
-        for (const m of css.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)'"\s]+))\s*\)/gi)) add(m[1] ?? m[2] ?? m[3], 'resource');
-        for (const m of css.matchAll(/@import\s+["']([^"']+)["']/gi)) add(m[1], 'resource');
-      };
+    const MAX_SCAN_FILES = 40, MAX_SCAN_CHARS = 5 * 1024 * 1024;
+    const JS_STRING = /(["'])((?:\\.|(?!\1)[^\\\n])*)\1|`((?:\\.|[^\\`])*)`/g;
+    function decodeEntities(text) { return text.replace(/&(amp|quot|#39|lt|gt|nbsp);/g, (m, e) => ({ amp: '&', quot: '"', '#39': "'", lt: '<', gt: '>', nbsp: '\u00a0' }[e])); }
+    function unescapeJs(text) {
+      return text.replace(/\\(u\{[0-9a-f]+\}|u[0-9a-f]{4}|x[0-9a-f]{2}|[\s\S])/gi, (m, e) => {
+        if (/^u\{/i.test(e)) { try { return String.fromCodePoint(parseInt(e.slice(2, -1), 16)); } catch (_) { return e; } }
+        if (/^[ux][0-9a-f]/i.test(e)) return String.fromCharCode(parseInt(e.slice(1), 16));
+        return { n: '\n', t: '\t', r: '\r', '\n': '' }[e] ?? e;
+      });
+    }
+    function escapeRegExp(text) { return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+    function shortCode(text) { const flat = text.replace(/\s+/g, ' ').trim(); return flat.length > 160 ? `${flat.slice(0, 157)}…` : flat; }
+    function fileLabel(href) { try { const url = new URL(href); return url.pathname.split('/').filter(Boolean).pop() || url.host; } catch (_) { return href; } }
+    // A file URL names a file: its last path segment has an extension.
+    function isFileUrl(href) { try { return /^[^/]*[^/.][^/]*\.[a-z0-9]{1,8}$/i.test(new URL(href).pathname.split('/').pop()); } catch (_) { return false; } }
+    // Index of the bracket closing the one at `open`, skipping quoted strings.
+    function closingBracket(text, open) {
+      const pairs = { '(': ')', '[': ']', '{': '}' }, stack = [];
+      for (let i = open; i < text.length; i++) {
+        const c = text[i];
+        if (c === '"' || c === "'" || c === '`') { for (i++; i < text.length && text[i] !== c; i++) if (text[i] === '\\') i++; continue; }
+        if (pairs[c]) stack.push(pairs[c]);
+        else if (c === ')' || c === ']' || c === '}') { if (stack.pop() !== c) return -1; if (!stack.length) return i; }
+      }
+      return -1;
+    }
+    function enclosingObject(text, index) {
+      let depth = 0;
+      for (let i = index - 1; i >= Math.max(0, index - 2000); i--) {
+        if (text[i] === '}') depth++;
+        else if (text[i] === '{') { if (!depth) { const close = closingBracket(text, i); return close < 0 ? null : text.slice(i, close + 1); } depth--; }
+      }
+      return null;
+    }
+
+    function newScan() { return { found: new Map(), notes: [], noteKeys: new Set(), blocked: new Set(), scripts: [], scannable: new Map() }; }
+    function addUrl(scan, raw, kind, base, from, info) {
+      const value = String(raw ?? '').trim();
+      if (!value || value.startsWith('#') || /^(data|blob|javascript|mailto|tel|about|sms):/i.test(value)) return null;
+      let url; try { url = new URL(value, base); } catch (_) { return null; }
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+      url.hash = '';
+      if (kind === 'other' && !isFileUrl(url.href)) return null;
+      const previous = scan.found.get(url.href);
+      if (!previous || KIND_RANK[kind] < KIND_RANK[previous.kind]) scan.found.set(url.href, { url: url.href, kind, from, info });
+      return url.href;
+    }
+    function addNote(scan, text) { if (!scan.noteKeys.has(text)) { scan.noteKeys.add(text); scan.notes.push(text); } }
+    function blockUrl(scan, raw, base, method, from) {
+      let href = raw; try { href = new URL(raw, base).href.replace(/#.*$/, ''); } catch (_) {}
+      scan.blocked.add(href);
+      addNote(scan, `${method} ${href} (in ${from}): not downloaded, only GET requests are fetched`);
+    }
+    function scanCss(scan, css, base, from) {
+      for (const m of css.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)'"\s]+))\s*\)/gi)) addUrl(scan, m[1] ?? m[2] ?? m[3], 'resource', base, from);
+      for (const m of css.matchAll(/@import\s+["']([^"']+)["']/gi)) addUrl(scan, m[1], 'resource', base, from);
+    }
+    // Page HTML: tag attributes, inline styles, and inline scripts (kept for the JS pass).
+    function scanHtml(scan, html, base, from) {
+      let text = html.replace(/(<script\b[^>]*>)([\s\S]*?)(<\/script>)/gi, (m, open, body, close) => { if (body.trim()) scan.scripts.push({ text: body, base, from }); return open + close; });
+      text = text.replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi, (m, open, body, close) => { scanCss(scan, body, base, from); return open + close; });
       for (const tagMatch of text.matchAll(/<([a-zA-Z][\w:-]*)\b([^>]*)>/g)) {
-        const tag = tagMatch[1].toLowerCase();
-        for (const m of tagMatch[2].matchAll(/([^\s="'\/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g)) {
-          const name = m[1].toLowerCase(), value = m[2] ?? m[3] ?? m[4];
-          if (name === 'srcset' || name === 'imagesrcset') decodeEntities(value).split(',').forEach(part => add(part.trim().split(/\s+/)[0], 'resource'));
-          else if (name === 'src' || name === 'poster' || (name === 'data' && tag === 'object')) add(value, 'resource');
-          else if (name === 'href') add(value, tag === 'link' ? 'resource' : 'link');
-          else if (name === 'action' || name === 'formaction') add(value, 'link');
-          else if (name === 'style') cssUrls(decodeEntities(value));
+        const tag = tagMatch[1].toLowerCase(), attrs = {};
+        for (const m of tagMatch[2].matchAll(/([^\s="'\/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g)) attrs[m[1].toLowerCase()] = decodeEntities(m[2] ?? m[3] ?? m[4]);
+        for (const [name, value] of Object.entries(attrs)) {
+          if (name === 'srcset' || name === 'imagesrcset') value.split(',').forEach(part => addUrl(scan, part.trim().split(/\s+/)[0], 'resource', base, from));
+          else if (name === 'src' || name === 'poster' || (name === 'data' && tag === 'object')) {
+            const href = addUrl(scan, value, 'resource', base, from);
+            if (href && tag === 'script') scan.scannable.set(href, 'js');
+          } else if (name === 'href') {
+            const href = addUrl(scan, value, tag === 'link' ? 'resource' : 'link', base, from);
+            if (href && tag === 'link' && /(^|\s)stylesheet(\s|$)/i.test(attrs.rel || '')) scan.scannable.set(href, 'css');
+          } else if (name === 'action' || name === 'formaction') {
+            const method = (attrs[name === 'formaction' ? 'formmethod' : 'method'] || 'GET').toUpperCase();
+            if (method === 'GET') addUrl(scan, value, 'link', base, from); else blockUrl(scan, value, base, method, from);
+          } else if (name === 'style') scanCss(scan, value, base, from);
         }
       }
-      cssUrls(text);
-      for (const m of text.matchAll(/https?:\/\/[^\s"'<>`()\\{}|^]+/gi)) add(m[0].replace(/[.,;:!?]+$/, ''), 'other');
-      return [...found.values()];
+      for (const m of text.matchAll(/https?:\/\/[^\s"'<>`()\\{}|^]+/gi)) addUrl(scan, decodeEntities(m[0].replace(/[.,;:!?]+$/, '')), 'other', base, from);
+    }
+
+    // One operand of a "+" chain: a string, a number, or a name/member/call chain.
+    function readOperand(js, pos) {
+      const rest = js.slice(pos, pos + 600);
+      let m;
+      if ((m = /^(["'])((?:\\.|(?!\1)[^\\\n])*)\1/.exec(rest))) return { part: { lit: unescapeJs(m[2]) }, end: pos + m[0].length };
+      if ((m = /^`((?:\\.|[^\\`])*)`/.exec(rest))) return { part: m[1].includes('${') ? { expr: m[0] } : { lit: unescapeJs(m[1]) }, end: pos + m[0].length };
+      if ((m = /^\d+(?:\.\d+)?\b/.exec(rest))) return { part: { lit: m[0] }, end: pos + m[0].length };
+      const name = /^[A-Za-z_$][\w$]*/;
+      let i;
+      if (rest[0] === '(') { const close = closingBracket(rest, 0); if (close < 0) return null; i = close + 1; }
+      else { m = name.exec(rest); if (!m) return null; i = m[0].length; }
+      for (;;) {
+        if (rest[i] === '.' && (m = name.exec(rest.slice(i + 1)))) i += 1 + m[0].length;
+        else if (rest[i] === '(' || rest[i] === '[') { const close = closingBracket(rest, i); if (close < 0) return null; i = close + 1; }
+        else break;
+      }
+      return { part: { expr: rest.slice(0, i) }, end: pos + i };
+    }
+    // The HTTP method a URL expression is used with, when its call site says so.
+    function requestMethod(js, start, end) {
+      const before = js.slice(Math.max(0, start - 160), start), after = js.slice(end, end + 1500);
+      let m, method = null;
+      if ((m = /\.open\(\s*(["'`])([A-Za-z]+)\1\s*,\s*$/.exec(before))) method = m[2];
+      else if ((m = /\.(post|put|patch|delete)\(\s*$/i.exec(before))) method = m[1];
+      else if (/\bsendBeacon\(\s*$/.test(before)) method = 'POST';
+      else if (/(?:\bfetch|\bnew\s+Request)\(\s*$/.test(before)) {
+        const options = /^\s*,\s*\{/.exec(after), close = options ? closingBracket(after, options[0].length - 1) : -1;
+        m = close > 0 && /\bmethod\s*:\s*(["'`])([A-Za-z]+)\1/.exec(after.slice(0, close + 1));
+        method = m ? m[2] : 'GET';
+      } else if (/\burl\s*:\s*$/.test(before)) {
+        m = /\b(?:method|type)\s*:\s*(["'`])([A-Za-z]+)\1/.exec(enclosingObject(js, start) || '');
+        if (m) method = m[2];
+      }
+      method = method?.toUpperCase();
+      return HTTP_METHODS.has(method) ? method : null;
+    }
+    // Live value of a plain global (data properties only: no getters or code run).
+    function readLive(path) {
+      if (path[0] === 'window' || path[0] === 'self' || path[0] === 'globalThis') path = path.slice(1);
+      if (path[0] === 'document' && path[1] === 'location') path = path.slice(1);
+      if (path[0] === 'location' && path.length === 2 && ['href', 'origin', 'protocol', 'host', 'hostname', 'port', 'pathname', 'search', 'hash'].includes(path[1])) return location[path[1]];
+      let value = executionWindow;
+      for (const segment of path) {
+        if (value == null || (typeof value !== 'object' && typeof value !== 'function')) return null;
+        let descriptor = null;
+        try { for (let o = value; o && !descriptor; o = Object.getPrototypeOf(o)) descriptor = Object.getOwnPropertyDescriptor(o, segment); } catch (_) { return null; }
+        if (!descriptor || !('value' in descriptor)) return null;
+        value = descriptor.value;
+      }
+      return typeof value === 'string' || typeof value === 'number' ? String(value) : null;
+    }
+    // A string the code assigns to this name, when it assigns exactly one.
+    function readAssigned(name, corpus) {
+      const id = escapeRegExp(name), values = new Set();
+      // name = "value"  (not followed by "+", so the whole value is known)
+      const assigned = new RegExp(`(?:^|[^\\w$.])${id}\\s*=\\s*(["'\`])((?:\\\\.|(?!\\1)[^\\\\\\n])*)\\1\\s*(?=[;,\\n)}]|$)`, 'g');
+      // { name: "value" }
+      const property = new RegExp(`[{,]\\s*(["']?)${id}\\1\\s*:\\s*(["'\`])((?:\\\\.|(?!\\2)[^\\\\\\n])*)\\2\\s*(?=[,}\\n])`, 'g');
+      for (const m of corpus.matchAll(assigned)) values.add(unescapeJs(m[2]));
+      for (const m of corpus.matchAll(property)) values.add(unescapeJs(m[3]));
+      return values.size === 1 ? [...values][0] : null;
+    }
+    function resolveOperand(expr, corpus) {
+      expr = expr.trim();
+      let m;
+      if ((m = /^(["'])((?:\\.|(?!\1)[^\\\n])*)\1$/.exec(expr))) return unescapeJs(m[2]);
+      if (/^\d+(?:\.\d+)?$/.test(expr)) return expr;
+      if ((m = /^(String|encodeURIComponent|encodeURI)\(([\s\S]*)\)$/.exec(expr))) {
+        const inner = resolveOperand(m[2], corpus);
+        if (inner == null) return null;
+        try { return { String, encodeURIComponent, encodeURI }[m[1]](inner); } catch (_) { return null; }
+      }
+      if (!/^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*|\[\s*(["'])[^"'\]]*\1\s*\])*$/.test(expr)) return null;
+      const path = [...expr.matchAll(/[A-Za-z_$][\w$]*|\[\s*["']([^"']*)["']\s*\]/g)].map(p => p[1] ?? p[0]);
+      return readLive(path) ?? readAssigned(path[path.length - 1], corpus);
+    }
+    function loadedUrls() {
+      const urls = new Set();
+      try { for (const entry of executionWindow.performance.getEntriesByType('resource')) urls.add(entry.name); } catch (_) {}
+      for (const el of document.querySelectorAll('iframe[src],frame[src],embed[src],script[src],img[src],source[src],video[src],audio[src],link[href],a[href],object[data]')) {
+        if (excluded(el)) continue;
+        const value = el.currentSrc || el.src || el.href || el.data;
+        if (typeof value === 'string') urls.add(value);
+      }
+      return [...urls].filter(u => /^https?:/i.test(u));
+    }
+    function resolveParts(parts, base, corpus) {
+      const values = parts.map(p => p.lit ?? resolveOperand(p.expr, corpus));
+      if (values.every(v => v != null)) return { urls: [values.join('')], how: 'resolved from values in the page' };
+      // Otherwise match the pattern against URLs the page has actually loaded.
+      let head = values[0] ?? '';
+      if (head.startsWith('//')) head = location.protocol + head;
+      else if (head && !/^https?:/i.test(head)) { try { head = new URL(head, base).href; } catch (_) { return { urls: [] }; } }
+      if (!/^https?:\/\/[^/]+\//i.test(head)) return { urls: [] };
+      const pattern = new RegExp(`^${[head, ...values.slice(1)].map(v => v == null ? '.*?' : escapeRegExp(v)).join('')}$`);
+      const urls = loadedUrls().filter(u => pattern.test(u) || pattern.test(u.replace(/#.*$/, '')));
+      return urls.length && urls.length <= 10 ? { urls, how: 'matched a URL the page loaded' } : { urls: [] };
+    }
+    // URL expressions in script text: a URL string, optionally continued by
+    // "+" operands, or a template literal. Shared by scanning and rewriting.
+    function* jsUrlExpressions(js) {
+      const literals = new RegExp(JS_STRING.source, 'g');
+      let m;
+      while ((m = literals.exec(js))) {
+        const start = m.index;
+        let parts;
+        if (m[3] !== undefined) {
+          parts = []; let last = 0;
+          for (const t of m[3].matchAll(/\$\{([^}]*)\}/g)) { if (t.index > last) parts.push({ lit: unescapeJs(m[3].slice(last, t.index)) }); parts.push({ expr: t[1] }); last = t.index + t[0].length; }
+          if (last < m[3].length) parts.push({ lit: unescapeJs(m[3].slice(last)) });
+        } else parts = [{ lit: unescapeJs(m[2]) }];
+        const head = parts[0]?.lit;
+        if (head == null) continue;
+        const absolute = /^(?:https?:)?\/\/[^\s/]/i.test(head), path = !absolute && /^\.{0,2}\/[^\s/*]/.test(head);
+        if (!absolute && !path) continue;
+        if (path && /\+\s*$/.test(js.slice(Math.max(0, start - 20), start))) continue; // the tail of a longer expression
+        let end = start + m[0].length;
+        for (;;) {
+          const plus = /^\s*\+\s*/.exec(js.slice(end, end + 50));
+          if (!plus) break;
+          const operand = readOperand(js, end + plus[0].length);
+          if (!operand) break;
+          parts.push(operand.part); end = operand.end;
+        }
+        literals.lastIndex = end;
+        yield { start, end, parts, quote: m[3] !== undefined ? '`' : m[1], dynamic: parts.some(p => p.lit === undefined) };
+      }
+    }
+    function scanJs(scan, js, base, from, corpus) {
+      for (const { start, end, parts, dynamic } of jsUrlExpressions(js)) {
+        const code = shortCode(js.slice(start, end));
+        const method = requestMethod(js, start, end);
+        if (method && method !== 'GET') {
+          if (dynamic) addNote(scan, `${method} ${code} (in ${from}): not downloaded, only GET requests are fetched`);
+          else blockUrl(scan, parts.map(p => p.lit).join(''), base, method, from);
+          continue;
+        }
+        if (!dynamic) { addUrl(scan, parts.map(p => p.lit).join(''), 'other', base, from); continue; }
+        const { urls, how } = resolveParts(parts, base, corpus);
+        for (const url of urls) addUrl(scan, url, 'dynamic', base, from, `${code} · ${how}`);
+        if (!urls.length) addNote(scan, `Built in code, value unknown: ${code} (in ${from})`);
+      }
+    }
+    // Plain text (a resource value): JS-style strings plus bare URLs.
+    function scanText(scan, text, base, from) {
+      scanJs(scan, text, base, from, text);
+      for (const m of text.matchAll(/https?:\/\/[^\s"'<>`()\\{}|^]+/gi)) addUrl(scan, m[0].replace(/[.,;:!?]+$/, ''), 'other', base, from);
     }
     const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
     function crc32(bytes) { let c = 0xFFFFFFFF; for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
@@ -1087,7 +1306,7 @@
       return new Blob([...parts, ...central, end.buffer], { type: 'application/zip' });
     }
     function shortHash(text) { let h = 5381; for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) >>> 0; return h.toString(16); }
-    function zipPathFor(href, used) {
+    function zipPathFor(href, used, stripQuery = false) {
       const url = new URL(href);
       const segments = url.pathname.split('/').filter(Boolean).map(seg => {
         try { seg = decodeURIComponent(seg); } catch (_) {}
@@ -1095,7 +1314,7 @@
       });
       if (!segments.length || url.pathname.endsWith('/')) segments.push('index.html');
       let file = segments.pop();
-      if (url.search) { const dot = file.lastIndexOf('.'), tag = `_${shortHash(url.search)}`; file = dot > 0 ? file.slice(0, dot) + tag + file.slice(dot) : file + tag; }
+      if (url.search && !stripQuery) { const dot = file.lastIndexOf('.'), tag = `_${shortHash(url.search)}`; file = dot > 0 ? file.slice(0, dot) + tag + file.slice(dot) : file + tag; }
       const base = ['files', url.host.replace(/:/g, '_'), ...segments, file].join('/');
       let path = base;
       for (let n = 2; used.has(path.toLowerCase()); n++) {
@@ -1104,6 +1323,73 @@
       }
       used.add(path.toLowerCase());
       return path;
+    }
+    // Rewriting saved copies: URLs that were saved point at their file in the
+    // ZIP (relative to the file being rewritten); other http(s) URLs are made
+    // absolute so they still work when the copy is opened from disk.
+    function relativePath(from, to) {
+      const a = from.split('/').slice(0, -1), b = to.split('/');
+      let i = 0;
+      while (i < a.length && i < b.length - 1 && a[i] === b[i]) i++;
+      return [...a.slice(i).map(() => '..'), ...b.slice(i).map(encodeURIComponent)].join('/');
+    }
+    function rewriteReference(raw, base, saved, fromPath) {
+      const value = raw.trim();
+      if (!value || value.startsWith('#') || /^(data|blob|javascript|mailto|tel|about|sms):/i.test(value)) return raw;
+      let url; try { url = new URL(value, base); } catch (_) { return raw; }
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return raw;
+      const hash = url.hash; url.hash = '';
+      const path = saved.get(url.href);
+      return (path ? relativePath(fromPath, path) : url.href) + hash;
+    }
+    function rewriteCssText(css, base, saved, fromPath) {
+      return css
+        .replace(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)'"\s]+))\s*\)/gi, (m, dq, sq, bare) => {
+          const value = dq ?? sq ?? bare, next = rewriteReference(value, base, saved, fromPath);
+          return next === value ? m : `url("${next.replace(/"/g, '%22')}")`;
+        })
+        .replace(/(@import\s+)(["'])([^"']+)\2/gi, (m, at, quote, value) => `${at}${quote}${rewriteReference(value, base, saved, fromPath)}${quote}`);
+    }
+    // Script URLs resolve against the page, so `fromPath` is the saved page.
+    // Only expressions whose value is a saved file are replaced; other strings
+    // are left alone so non-URL text (routes, patterns) is never altered.
+    function rewriteJsText(js, base, saved, fromPath, corpus) {
+      let out = '', last = 0;
+      for (const { start, end, parts, quote, dynamic } of jsUrlExpressions(js)) {
+        let value;
+        if (!dynamic) value = parts.map(p => p.lit).join('');
+        else { const { urls } = resolveParts(parts, base, corpus); if (urls.length !== 1) continue; value = urls[0]; }
+        let url; try { url = new URL(value, base); } catch (_) { continue; }
+        const hash = url.hash; url.hash = '';
+        const path = saved.get(url.href);
+        if (!path) continue;
+        const relative = relativePath(fromPath, path) + hash;
+        out += js.slice(last, start) + quote + relative.replace(/\\/g, '\\\\').split(quote).join(`\\${quote}`) + quote;
+        last = end;
+      }
+      return out + js.slice(last);
+    }
+    function rewriteHtmlText(html, base, saved, fromPath, scripts = null) {
+      const attributes = (tag, text) => text.replace(/([^\s="'\/>]+)(\s*=\s*)(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g, (m, name, eq, dq, sq, bare) => {
+        const lower = name.toLowerCase(), value = decodeEntities(dq ?? sq ?? bare);
+        let next;
+        if (tag === 'base' && lower === 'href') return ''; // the saved copy resolves links from its own location
+        if (lower === 'srcset' || lower === 'imagesrcset') next = value.split(',').filter(part => part.trim()).map(part => { const [url, ...rest] = part.trim().split(/\s+/); return [rewriteReference(url, base, saved, fromPath), ...rest].join(' '); }).join(', ');
+        else if (['src', 'href', 'poster', 'action', 'formaction'].includes(lower) || (lower === 'data' && tag === 'object')) next = rewriteReference(value, base, saved, fromPath);
+        else if (lower === 'style') next = rewriteCssText(value, base, saved, fromPath);
+        else return m;
+        return next === value ? m : `${name}${eq}"${next.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"`;
+      });
+      return html.replace(/(<script\b)([^>]*>)([\s\S]*?<\/script>)|(<style\b)([^>]*>)([\s\S]*?)(<\/style>)|<([a-zA-Z][\w:-]*)\b([^>]*)>/gi,
+        (m, sOpen, sAttrs, sRest, stOpen, stAttrs, stBody, stClose, tag, tagAttrs) => {
+          if (sOpen) {
+            const body = sRest.slice(0, -'</script>'.length);
+            return sOpen + attributes('script', sAttrs) + (scripts ? rewriteJsText(body, base, saved, fromPath, scripts.corpus) : body) + sRest.slice(-'</script>'.length);
+          }
+          if (stOpen) return stOpen + attributes('style', stAttrs) + rewriteCssText(stBody, base, saved, fromPath) + stClose;
+          const lower = tag.toLowerCase(), rewritten = attributes(lower, tagAttrs);
+          return `<${tag}${lower === 'base' ? rewritten.replace(/\s+$/, '') : rewritten}>`;
+        });
     }
     async function fetchBytes(href, signal) {
       const controller = new AbortController(), abort = () => controller.abort();
@@ -1116,80 +1402,142 @@
         return new Uint8Array(await response.arrayBuffer());
       } finally { clearTimeout(timer); signal.removeEventListener('abort', abort); }
     }
+    async function runPool(items, worker, signal) {
+      let next = 0;
+      await Promise.all(Array.from({ length: Math.min(EXPORT_CONCURRENCY, items.length) }, async () => {
+        while (next < items.length && !signal.aborted) await worker(items[next++]);
+      }));
+    }
+    // Find every URL: the page source first, then the page's own scripts and
+    // stylesheets (fetched once; the bytes are reused in the ZIP).
+    async function scanForExport(source, fetchCached, signal, progress) {
+      const scan = newScan(), base = document.baseURI, from = 'page source';
+      if (source.extension === 'html') scanHtml(scan, source.text, base, from);
+      else scanText(scan, source.text, base, source.name);
+      const files = [...scan.scannable].slice(0, MAX_SCAN_FILES);
+      let done = 0;
+      progress(`Scanning scripts and stylesheets: 0 of ${files.length}`);
+      await runPool(files, async ([href, type]) => {
+        try {
+          const bytes = await fetchCached(href);
+          if (bytes.length <= MAX_SCAN_CHARS) {
+            const text = new TextDecoder().decode(bytes);
+            if (type === 'css') scanCss(scan, text, href, fileLabel(href));
+            else scan.scripts.push({ text, base, from: fileLabel(href) });
+          }
+        } catch (_) { /* Reported if the file is chosen for download. */ }
+        progress(`Scanning scripts and stylesheets: ${++done} of ${files.length}`);
+      }, signal);
+      const corpus = scan.scripts.map(s => s.text).join('\n;\n');
+      for (const script of scan.scripts) scanJs(scan, script.text, script.base, script.from, corpus);
+      for (const href of scan.blocked) scan.found.delete(href);
+      const ofType = kind => new Set([...scan.scannable].filter(([, type]) => type === kind).map(([href]) => href));
+      return { urls: [...scan.found.values()], notes: scan.notes, scannedFiles: files.length, stylesheets: ofType('css'), scriptFiles: ofType('js'), corpus };
+    }
     function openExportAllDialog() {
       const source = currentSource();
-      const urls = scanSourceUrls(source.text);
-      if (!urls.length) return setStatus('No downloadable URLs found in the source');
-      const shown = urls.slice(0, MAX_EXPORT_URLS);
       const modal = document.createElement('div'); modal.className = 'dialog';
       const box = document.createElement('div'); box.className = 'dialogbox wide'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', 'Export all files');
       const heading = document.createElement('h3'); heading.textContent = 'Export all files';
       const intro = document.createElement('div'); intro.className = 'footerhint';
-      intro.textContent = `Found ${urls.length} URL${urls.length === 1 ? '' : 's'} in the source${urls.length > shown.length ? ` (showing the first ${shown.length})` : ''}. Checked files are fetched by this page and saved with the source in a ZIP. Files on other sites download only if they allow cross-origin access; anything that fails is listed in download-report.txt.`;
-      box.append(heading, intro);
-      const boxes = [];
-      for (const [kind, label, hint, checked] of URL_KINDS) {
-        const items = shown.filter(u => u.kind === kind);
-        if (!items.length) continue;
-        const group = document.createElement('div'); group.className = 'urlgroup'; group.dataset.kind = kind;
-        const head = document.createElement('label'); head.className = 'urlgroup-head'; head.title = hint;
-        const all = document.createElement('input'); all.type = 'checkbox'; all.checked = checked; all.setAttribute('aria-label', `Select all ${label.toLowerCase()}`);
-        head.append(all, document.createTextNode(`${label} (${items.length})`));
-        const list = document.createElement('div'); list.className = 'urllist';
-        const groupBoxes = items.map(item => {
-          const row = document.createElement('label'); row.className = 'urlrow';
-          const check = document.createElement('input'); check.type = 'checkbox'; check.checked = checked; check.value = item.url;
-          const text = document.createElement('span'); text.textContent = item.url;
-          row.append(check, text); list.appendChild(row); boxes.push(check); return check;
-        });
-        all.addEventListener('change', () => { groupBoxes.forEach(c => { c.checked = all.checked; }); updateCount(); });
-        list.addEventListener('change', () => { const on = groupBoxes.filter(c => c.checked).length; all.checked = on === groupBoxes.length; all.indeterminate = on > 0 && on < groupBoxes.length; updateCount(); });
-        group.append(head, list); box.appendChild(group);
-      }
+      const body = document.createElement('div');
       const progress = document.createElement('div'); progress.className = 'exportprogress'; progress.setAttribute('aria-live', 'polite');
       const actions = document.createElement('div'); actions.className = 'actions';
       const cancel = document.createElement('button'); cancel.textContent = 'Cancel';
-      const start = document.createElement('button'); start.dataset.exportStart = 'true';
-      actions.append(cancel, start); box.append(progress, actions);
+      const start = document.createElement('button'); start.dataset.exportStart = 'true'; start.textContent = 'Download ZIP'; start.disabled = true;
+      actions.append(cancel, start); box.append(heading, intro, body, progress, actions);
       modal.appendChild(box); root.querySelector('.content').appendChild(modal);
-      function updateCount() { const n = boxes.filter(c => c.checked).length; start.textContent = n ? `Download ZIP (${n} file${n === 1 ? '' : 's'})` : 'Download ZIP (source only)'; }
-      updateCount();
-      let controller = null;
-      const close = () => { controller?.abort(); modal.remove(); };
+      const controller = new AbortController();
+      let downloading = false;
+      const close = () => { controller.abort(); modal.remove(); setStatus(statusText.textContent, 'No external requests'); };
       cancel.addEventListener('click', close);
-      modal.addEventListener('click', e => { if (e.target === modal && !controller) close(); });
+      modal.addEventListener('click', e => { if (e.target === modal && !downloading) close(); });
       modal.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); close(); } });
-      start.addEventListener('click', async () => {
-        const chosen = boxes.filter(c => c.checked).map(c => c.value);
-        controller = new AbortController();
-        boxes.forEach(c => { c.disabled = true; }); box.querySelectorAll('.urlgroup-head input').forEach(c => { c.disabled = true; }); start.disabled = true;
-        const used = new Set(), entries = [], report = [];
-        const sourceFile = `${safeFilename(source.name)}.${source.extension}`; used.add(sourceFile.toLowerCase());
-        entries.push({ path: sourceFile, data: source.text });
-        let done = 0, failed = 0, bytes = 0, next = 0;
-        const show = () => { progress.textContent = `Fetched ${done} of ${chosen.length}${failed ? ` · ${failed} failed` : ''}`; setStatus(progress.textContent, 'Fetching files on request'); };
-        show();
-        const worker = async () => {
-          while (next < chosen.length && !controller.signal.aborted) {
-            const href = chosen[next++];
+      cancel.focus();
+      const cache = new Map();
+      const fetchCached = href => { if (!cache.has(href)) cache.set(href, fetchBytes(href, controller.signal)); return cache.get(href); };
+      const show = text => { progress.textContent = text; setStatus(text, 'Fetching files on request'); };
+      scanForExport(source, fetchCached, controller.signal, show).then(({ urls, notes, scannedFiles, stylesheets, scriptFiles, corpus }) => {
+        if (controller.signal.aborted) return;
+        progress.textContent = '';
+        setStatus('Choose the files to export', 'Fetching files on request');
+        const shown = urls.slice(0, MAX_EXPORT_URLS);
+        intro.textContent = `Found ${urls.length} URL${urls.length === 1 ? '' : 's'} in the source${scannedFiles ? ` and ${scannedFiles} script/stylesheet file${scannedFiles === 1 ? '' : 's'}` : ''}${urls.length > shown.length ? ` (showing the first ${shown.length})` : ''}. Checked files are fetched by this page and saved with the source in a ZIP. Files on other sites download only if they allow cross-origin access; anything that fails is listed in download-report.txt.`;
+        const options = document.createElement('div'); options.className = 'footerhint exportsettings';
+        options.textContent = `Links in the saved copy: ${state.rewriteUrls ? 'rewritten to the downloaded files' : 'kept as they are'} · Script URLs: ${state.rewriteScripts ? 'rewritten' : 'kept as they are'} · Saved names: ${state.stripQuery ? 'without URL variables' : 'with URL variables'} (change in Settings)`;
+        intro.after(options);
+        const boxes = [];
+        const updateCount = () => { const n = boxes.filter(c => c.checked).length; start.textContent = n ? `Download ZIP (${n} file${n === 1 ? '' : 's'})` : 'Download ZIP (source only)'; };
+        for (const [kind, label, hint, checked] of URL_KINDS) {
+          const items = shown.filter(u => u.kind === kind);
+          if (!items.length) continue;
+          const group = document.createElement('div'); group.className = 'urlgroup'; group.dataset.kind = kind;
+          const head = document.createElement('label'); head.className = 'urlgroup-head'; head.title = hint;
+          const all = document.createElement('input'); all.type = 'checkbox'; all.checked = checked; all.setAttribute('aria-label', `Select all ${label.toLowerCase()}`);
+          head.append(all, document.createTextNode(`${label} (${items.length})`));
+          const list = document.createElement('div'); list.className = 'urllist';
+          const groupBoxes = items.map(item => {
+            const row = document.createElement('label'); row.className = 'urlrow'; row.title = `Found in ${item.from}`;
+            const check = document.createElement('input'); check.type = 'checkbox'; check.checked = checked; check.value = item.url;
+            const text = document.createElement('span'); text.className = 'urltext'; text.textContent = item.url;
+            if (item.info) { const info = document.createElement('span'); info.className = 'urlinfo'; info.textContent = `from ${item.info}`; text.append(document.createElement('br'), info); }
+            row.append(check, text); list.appendChild(row); boxes.push(check); return check;
+          });
+          all.addEventListener('change', () => { groupBoxes.forEach(c => { c.checked = all.checked; }); updateCount(); });
+          list.addEventListener('change', () => { const on = groupBoxes.filter(c => c.checked).length; all.checked = on === groupBoxes.length; all.indeterminate = on > 0 && on < groupBoxes.length; updateCount(); });
+          group.append(head, list); body.appendChild(group);
+        }
+        if (!shown.length) { const none = document.createElement('div'); none.className = 'empty'; none.textContent = 'No downloadable URLs found. The ZIP will contain the source only.'; body.appendChild(none); }
+        if (notes.length) {
+          const details = document.createElement('details'); details.className = 'urlgroup urlnotes';
+          const summary = document.createElement('summary'); summary.textContent = `Not included (${notes.length})`;
+          const list = document.createElement('div'); list.className = 'urllist';
+          for (const note of notes) { const row = document.createElement('div'); row.className = 'urlrow'; row.textContent = note; list.appendChild(row); }
+          details.append(summary, list); body.appendChild(details);
+        }
+        updateCount(); start.disabled = false; start.focus();
+        start.addEventListener('click', async () => {
+          downloading = true;
+          const chosen = boxes.filter(c => c.checked).map(c => c.value);
+          box.querySelectorAll('input').forEach(c => { c.disabled = true; }); start.disabled = true;
+          const used = new Set(), entries = [], report = [], saved = new Map();
+          const rewrite = !!state.rewriteUrls, rewriteScripts = !!state.rewriteScripts, stripQuery = !!state.stripQuery;
+          const sourceFile = `${safeFilename(source.name)}.${source.extension}`; used.add(sourceFile.toLowerCase());
+          let done = 0, failed = 0, bytes = 0;
+          const tick = () => show(`Fetched ${done} of ${chosen.length}${failed ? ` · ${failed} failed` : ''}`);
+          tick();
+          await runPool(chosen, async href => {
             try {
               if (bytes >= MAX_EXPORT_BYTES) throw new Error(`skipped: ZIP size limit (${MAX_EXPORT_BYTES / 1048576} MB) reached`);
-              const data = await fetchBytes(href, controller.signal);
+              const data = await fetchCached(href);
               bytes += data.length;
-              const path = zipPathFor(href, used); entries.push({ path, data }); report.push(`OK      ${href}\n        -> ${path}`);
+              const path = zipPathFor(href, used, stripQuery); saved.set(href, path); entries.push({ href, path, data }); report.push(`OK      ${href}\n        -> ${path}`);
             } catch (e) { failed++; report.push(`FAILED  ${href}\n        ${e.message}`); }
-            done++; show();
+            done++; tick();
+          }, controller.signal);
+          if (controller.signal.aborted) return;
+          let sourceText = source.text;
+          const scripts = rewriteScripts ? { corpus } : null;
+          if (source.extension === 'html' && (rewrite || rewriteScripts)) {
+            // With only script rewriting on, markup outside scripts keeps its URLs.
+            sourceText = rewrite ? rewriteHtmlText(sourceText, document.baseURI, saved, sourceFile, scripts)
+              : sourceText.replace(/(<script\b[^>]*>)([\s\S]*?)(<\/script>)/gi, (m, open, body, close) => open + rewriteJsText(body, document.baseURI, saved, sourceFile, corpus) + close);
+          } else if (rewriteScripts && source.extension !== 'html') sourceText = rewriteJsText(sourceText, document.baseURI, saved, sourceFile, corpus);
+          for (const entry of entries) {
+            let pathname = ''; try { pathname = new URL(entry.href).pathname; } catch (_) {}
+            if (rewrite && (stylesheets.has(entry.href) || /\.css$/i.test(pathname))) entry.data = rewriteCssText(new TextDecoder().decode(entry.data), entry.href, saved, entry.path);
+            else if (rewriteScripts && (scriptFiles.has(entry.href) || /\.m?js$/i.test(pathname))) entry.data = rewriteJsText(new TextDecoder().decode(entry.data), document.baseURI, saved, sourceFile, corpus);
           }
-        };
-        await Promise.all(Array.from({ length: Math.min(EXPORT_CONCURRENCY, chosen.length) }, worker));
-        if (controller.signal.aborted) { setStatus('Export cancelled', 'No external requests'); return; }
-        entries.push({ path: 'download-report.txt', data: `Exported from ${location.href}\n${new Date().toISOString()}\nSource: ${sourceFile}\nFiles: ${chosen.length - failed} saved, ${failed} failed\n\n${report.join('\n')}\n` });
-        const zipName = `${safeFilename(source.name)}-files.zip`;
-        try { downloadBlob(buildZip(entries), zipName); setStatus(`Exported ${zipName}: ${chosen.length - failed} file${chosen.length - failed === 1 ? '' : 's'} saved${failed ? `, ${failed} failed (see download-report.txt)` : ''}`, `Fetched ${chosen.length} file${chosen.length === 1 ? '' : 's'} on request`); }
-        catch (e) { setStatus(`Export failed: ${e.message}`); }
-        modal.remove();
+          entries.unshift({ path: sourceFile, data: sourceText });
+          const notesText = notes.length ? `\n\nNot included:\n${notes.map(n => `  ${n}`).join('\n')}` : '';
+          const settingsText = `Links: ${rewrite ? 'rewritten to the saved copies (page source and stylesheets)' : 'unchanged'}\nScript URLs: ${rewriteScripts ? 'rewritten to the saved copies (inline and saved scripts)' : 'unchanged'}\nSaved names: ${stripQuery ? 'URL variables (query strings) removed' : 'URL variables kept as a short hash'}`;
+          entries.push({ path: 'download-report.txt', data: `Exported from ${location.href}\n${new Date().toISOString()}\nSource: ${sourceFile}\nFiles: ${chosen.length - failed} saved, ${failed} failed\n${settingsText}\n\n${report.join('\n')}${notesText}\n` });
+          const zipName = `${safeFilename(source.name)}-files.zip`;
+          try { downloadBlob(buildZip(entries), zipName); setStatus(`Exported ${zipName}: ${chosen.length - failed} file${chosen.length - failed === 1 ? '' : 's'} saved${failed ? `, ${failed} failed (see download-report.txt)` : ''}`, `Fetched ${chosen.length} file${chosen.length === 1 ? '' : 's'} on request`); }
+          catch (e) { setStatus(`Export failed: ${e.message}`); }
+          modal.remove();
+        });
       });
-      start.focus();
     }
     function updateSourceButtons() {
       const beautify = root.querySelector('[data-action="beautify-source"]');
@@ -1364,6 +1712,7 @@
       lastSavedValues = JSON.stringify(preferenceValues());
       cachePreferences({ ...preferenceValues(), updatedAt: savedAt });
       updateTab(state.activeTab, false);
+      renderSettings();
       applyGeometry();
       setInspectorClosed(state.closed, false);
     }
@@ -1498,6 +1847,7 @@
       listen('.title','pointermove',moveDrag);listen('.title','pointerup',endDrag);listen('.title','pointercancel',endDrag);listen('.title','lostpointercapture',endDrag);
       root.querySelectorAll('[data-resize]').forEach(h=>{h.addEventListener('pointerdown',startResize);h.addEventListener('pointermove',moveResize);h.addEventListener('pointerup',endResize);h.addEventListener('pointercancel',endResize);});
       listen('#resource-filter','input',refreshResources);
+      listen(root,'change',e=>{const key=e.target?.dataset?.setting;if(!key)return;state[key]=e.target.checked;safeSave();setStatus(`${e.target.closest('.setting').querySelector('strong').textContent}: ${e.target.checked?'on':'off'}`);});
       listen('#command','keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();executeCommand();}else if(e.key==='ArrowUp'&&e.target.selectionStart===0){e.preventDefault();stateLocal.historyIndex=Math.max(0,stateLocal.historyIndex-1);e.target.value=stateLocal.commandHistory[stateLocal.historyIndex]||'';}else if(e.key==='ArrowDown'&&e.target.selectionStart===e.target.value.length){e.preventDefault();stateLocal.historyIndex=Math.min(stateLocal.commandHistory.length,stateLocal.historyIndex+1);e.target.value=stateLocal.commandHistory[stateLocal.historyIndex]||'';}});
       // The toolbar is rebuilt on every tab switch, so its inputs are handled by delegation.
       listen(root,'keydown',e=>{if(e.key!=='Enter')return;const id=e.target?.id;if(id==='element-filter'){e.preventDefault();searchElements();}else if(id==='source-search'){e.preventDefault();findSource();}});
