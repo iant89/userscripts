@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Inspector
 // @namespace    https://github.com/iant89/userscripts
-// @version      0.4.3
+// @version      0.4.4
 // @description  A mobile-friendly, self-contained web inspector for the current page.
 // @match        *://*/*
 // @run-at       document-start
@@ -229,7 +229,9 @@
   const APP_ID = 'web-inspector-host-v1';
   const INSTANCE_KEY = '__webInspectorInstanceV1';
   const STORAGE_KEY = 'webInspector.preferences.v1';
-  const MAX_TREE_NODES = 500;
+  const MAX_TREE_NODES = 500; // rows drawn at once
+  const TREE_PAGE = 250; // rows added by "Show earlier/more"
+  const MAX_TREE_SCAN = 20000; // visible nodes walked to build the row list
   const MAX_CONSOLE_ENTRIES = 250;
   const SNAP_DISTANCE = 34;
   const SNAP_DELAY = 280;
@@ -337,7 +339,7 @@
       .wi.idle{opacity:.76}.wi.dragging,.wi.resizing{transition:none;opacity:1}.wi.closed{display:none}
       .title{height:44px;min-height:44px;display:flex;align-items:center;gap:8px;padding:0 8px 0 12px;background:linear-gradient(110deg,#26364b,#1c2634);border-bottom:1px solid var(--line);touch-action:none;user-select:none;cursor:grab}
       .title:active{cursor:grabbing}.brand{display:flex;align-items:center;gap:8px;min-width:0;flex:1}.logo{width:24px;height:24px;border-radius:7px;background:#388bd0;display:grid;place-items:center;font-weight:800;color:white}.titletext{font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.context{color:var(--muted);font-size:11px;margin-left:3px}
-      button{font:inherit;color:inherit;border:1px solid transparent;background:transparent;border-radius:7px;min-width:36px;height:34px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 8px}button:hover{background:#ffffff12;border-color:#ffffff14}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}.icon{font-size:16px;line-height:1}.title button{width:38px;height:38px;font-size:18px}.close:hover{background:#9f3942}.tabs{display:flex;gap:4px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow:auto;scrollbar-width:thin}.tab{white-space:nowrap;color:var(--muted);padding:5px 11px}.tab[aria-selected="true"]{color:var(--text);background:#2d4056;border-color:#47607c}.toolbar{display:flex;align-items:center;gap:4px;min-height:42px;padding:4px 8px;background:#141a23;border-bottom:1px solid var(--line);overflow:auto}.toolbar .spacer{flex:1}.toolbar button{min-width:36px}.content{position:relative;display:flex;flex:1;min-height:0;overflow:hidden}.panel{display:none;flex:1;min-height:0;min-width:0}.panel.active{display:flex}.columns{display:flex;flex:1;min-width:0;min-height:0}.treepane{width:42%;min-width:115px;border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}.detailpane{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}.subhead{padding:6px 9px;color:var(--muted);font-size:11px;letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}.tree,.scroll{overflow:auto;overscroll-behavior:contain;min-height:0;flex:1;padding:6px}.tree{display:grid;grid-template-columns:minmax(max-content,1fr);align-content:start}.tree-row{box-sizing:border-box;height:auto;min-height:25px;display:flex;align-items:center;gap:4px;padding:2px 5px;border-radius:5px;white-space:nowrap;cursor:pointer;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.tree-row:hover{background:#ffffff0a}.tree-row.selected{background:#23507a;color:#fff}.tree-row .twisty{width:18px;min-width:18px;height:22px;padding:0;color:var(--muted)}.tree-row .twisty,.tree-row .tag{flex-shrink:0}.tree-row .tag{color:#7ec8ff}.tree-row .meta{color:#b3becb}.muted{color:var(--muted)}.empty{padding:18px;color:var(--muted);text-align:center}.field{width:100%;background:#0d1118;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:7px 8px;font:inherit}.field.small{padding:5px 7px}.field,textarea,select{font-size:14px}.editor{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical;min-height:60px;max-height:35%;tab-size:2}.label{font-size:11px;color:var(--muted);margin:9px 0 4px}.detail-actions{display:flex;gap:5px;flex-wrap:wrap;padding:7px;border-bottom:1px solid var(--line)}.htmlview,.sourceview{margin:0;white-space:pre;overflow:auto;flex:1;padding:10px;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;tab-size:2;color:#d7e2ef}.tok-tag{color:#76c7ff}.tok-attr{color:#c6a0f6}.tok-str{color:#a7dc8b}.tok-comment{color:#718096}.tok-text{color:#d7e2ef}.tok-key{color:#f0c674}.tok-num{color:#ef9f76}.tok-punc{color:#b9c5d3}.status{min-height:24px;padding:3px 9px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:center}.status .right{margin-left:auto}.consolepanel{flex-direction:column}.consolelog{flex:1;min-height:0;overflow:auto;padding:5px}.entry{padding:5px 8px;border-bottom:1px solid #ffffff0b;white-space:pre-wrap;overflow-wrap:anywhere}.entry.warn{background:#7d5b1b22}.entry.error{background:#842d3828}.entry.debug{color:#b1a5cf}.entry .stamp{color:#8594a7;font-size:10px;margin-right:7px}.entry .kind{font-weight:700;margin-right:6px}.command-area{border-top:1px solid var(--line);padding:7px;display:flex;gap:7px;align-items:flex-end}.command-area textarea{flex:1;min-height:40px;max-height:125px;resize:vertical;font:13px/1.4 ui-monospace,monospace}.resourcepanel{flex-direction:column}.resource-type{display:flex;padding:6px 8px;gap:4px;border-bottom:1px solid var(--line)}.resource-type button[aria-pressed="true"]{background:#2d4056}.reslist{flex:1;min-height:0;overflow:auto}.resrow{display:grid;grid-template-columns:minmax(90px,1fr) minmax(80px,2fr);gap:8px;padding:7px 9px;border-bottom:1px solid #ffffff0a;cursor:pointer}.resrow:hover{background:#ffffff0a}.resrow.selected{background:#23507a}.reskey,.resvalue{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.reskey{font:12px ui-monospace,monospace;color:#a9d5ff}.resvalue{color:var(--muted)}.filterbox{width:150px}.sourcepanel{flex-direction:column}.sourcebar{display:flex;align-items:center;gap:7px;padding:5px 8px;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted)}.sourceview{flex:1}.notice{background:#573e14;color:#ffe1a3;padding:6px 9px;font-size:11px}.resize{position:absolute;z-index:5;touch-action:none}.resize.e,.resize.w{top:14px;bottom:14px;width:10px;cursor:ew-resize}.resize.e{right:-4px}.resize.w{left:-4px}.resize.n,.resize.s{height:10px;left:14px;right:14px;cursor:ns-resize}.resize.n{top:-4px}.resize.s{bottom:-4px}.resize.ne,.resize.nw,.resize.se,.resize.sw{width:18px;height:18px;z-index:6}.resize.ne{right:-4px;top:-4px;cursor:nesw-resize}.resize.nw{left:-4px;top:-4px;cursor:nwse-resize}.resize.se{right:-4px;bottom:-4px;cursor:nwse-resize}.resize.sw{left:-4px;bottom:-4px;cursor:nesw-resize}.ghost{position:fixed;z-index:2147483645;border:2px solid #70c5ff;background:#55aeef33;border-radius:10px;pointer-events:none;display:none;transition:all .18s}.wi.collapsed .tabs,.wi.collapsed .toolbar,.wi.collapsed .content,.wi.collapsed .status,.wi.collapsed .resize{display:none}.wi.collapsed{height:44px!important;min-height:44px!important;border-radius:10px}.wi.dock-left,.wi.dock-right{border-radius:0}.wi.dock-top,.wi.dock-bottom{border-radius:0}.wi.dock-top .title{order:2;border-top:1px solid var(--line);border-bottom:0}.wi.dock-top .tabs{order:0}.wi.dock-top .toolbar{order:1}.wi.dock-top .content{order:0}.wi.dock-bottom .title{order:0}.wi.dock-bottom .tabs{order:1}.wi.dock-bottom .toolbar{order:2}.wi.dock-bottom .content{order:3}/* Geometry already anchors vertical docks; translating during the height animation hides the title. */.wi.dock-top.collapsed,.wi.dock-bottom.collapsed{transform:none}.wi.dock-left.collapsed{transform:translateX(calc(-100% + 54px))}.wi.dock-right.collapsed{transform:translateX(calc(100% - 54px))}.wi.dock-left.collapsed .title [data-action="collapse"]{order:1}.wi.dock-right.collapsed .title [data-action="collapse"]{order:-1}.dialog{position:absolute;z-index:10;inset:0;background:#0009;display:grid;place-items:center;padding:16px}.dialogbox{width:min(440px,100%);max-height:90%;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;box-shadow:0 15px 55px #000b}.dialogbox h3{margin:0 0 10px}.dialogbox .actions{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}.footerhint{font-size:11px;color:var(--muted)}
+      button{font:inherit;color:inherit;border:1px solid transparent;background:transparent;border-radius:7px;min-width:36px;height:34px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 8px}button:hover{background:#ffffff12;border-color:#ffffff14}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}.icon{font-size:16px;line-height:1}.title button{width:38px;height:38px;font-size:18px}.close:hover{background:#9f3942}.tabs{display:flex;gap:4px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow:auto;scrollbar-width:thin}.tab{white-space:nowrap;color:var(--muted);padding:5px 11px}.tab[aria-selected="true"]{color:var(--text);background:#2d4056;border-color:#47607c}.toolbar{display:flex;align-items:center;gap:4px;min-height:42px;padding:4px 8px;background:#141a23;border-bottom:1px solid var(--line);overflow:auto}.toolbar .spacer{flex:1}.toolbar button{min-width:36px}.content{position:relative;display:flex;flex:1;min-height:0;overflow:hidden}.panel{display:none;flex:1;min-height:0;min-width:0}.panel.active{display:flex}.columns{display:flex;flex:1;min-width:0;min-height:0}.treepane{width:42%;min-width:115px;border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}.detailpane{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}.subhead{padding:6px 9px;color:var(--muted);font-size:11px;letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}.tree,.scroll{overflow:auto;overscroll-behavior:contain;min-height:0;flex:1;padding:6px}.tree{display:grid;grid-template-columns:minmax(max-content,1fr);align-content:start}.tree-row{box-sizing:border-box;height:auto;min-height:25px;display:flex;align-items:center;gap:4px;padding:2px 5px;border-radius:5px;white-space:nowrap;cursor:pointer;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.tree-row:hover{background:#ffffff0a}.tree-row.selected{background:#23507a;color:#fff}.tree-row .twisty{width:18px;min-width:18px;height:22px;padding:0;color:var(--muted)}.tree-row .twisty,.tree-row .tag{flex-shrink:0}.tree-more{justify-self:start;height:28px;margin:4px 2px;color:var(--accent);font-size:12px;border-color:var(--line)}.tree-row .tag{color:#7ec8ff}.tree-row .meta{color:#b3becb}.muted{color:var(--muted)}.empty{padding:18px;color:var(--muted);text-align:center}.field{width:100%;background:#0d1118;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:7px 8px;font:inherit}.field.small{padding:5px 7px}.field,textarea,select{font-size:14px}.editor{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical;min-height:60px;max-height:35%;tab-size:2}.label{font-size:11px;color:var(--muted);margin:9px 0 4px}.detail-actions{display:flex;gap:5px;flex-wrap:wrap;padding:7px;border-bottom:1px solid var(--line)}.htmlview,.sourceview{margin:0;white-space:pre;overflow:auto;flex:1;padding:10px;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;tab-size:2;color:#d7e2ef}.tok-tag{color:#76c7ff}.tok-attr{color:#c6a0f6}.tok-str{color:#a7dc8b}.tok-comment{color:#718096}.tok-text{color:#d7e2ef}.tok-key{color:#f0c674}.tok-num{color:#ef9f76}.tok-punc{color:#b9c5d3}.status{min-height:24px;padding:3px 9px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:center}.status .right{margin-left:auto}.consolepanel{flex-direction:column}.consolelog{flex:1;min-height:0;overflow:auto;padding:5px}.entry{padding:5px 8px;border-bottom:1px solid #ffffff0b;white-space:pre-wrap;overflow-wrap:anywhere}.entry.warn{background:#7d5b1b22}.entry.error{background:#842d3828}.entry.debug{color:#b1a5cf}.entry .stamp{color:#8594a7;font-size:10px;margin-right:7px}.entry .kind{font-weight:700;margin-right:6px}.command-area{border-top:1px solid var(--line);padding:7px;display:flex;gap:7px;align-items:flex-end}.command-area textarea{flex:1;min-height:40px;max-height:125px;resize:vertical;font:13px/1.4 ui-monospace,monospace}.resourcepanel{flex-direction:column}.resource-type{display:flex;padding:6px 8px;gap:4px;border-bottom:1px solid var(--line)}.resource-type button[aria-pressed="true"]{background:#2d4056}.reslist{flex:1;min-height:0;overflow:auto}.resrow{display:grid;grid-template-columns:minmax(90px,1fr) minmax(80px,2fr);gap:8px;padding:7px 9px;border-bottom:1px solid #ffffff0a;cursor:pointer}.resrow:hover{background:#ffffff0a}.resrow.selected{background:#23507a}.reskey,.resvalue{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.reskey{font:12px ui-monospace,monospace;color:#a9d5ff}.resvalue{color:var(--muted)}.filterbox{width:150px}.sourcepanel{flex-direction:column}.sourcebar{display:flex;align-items:center;gap:7px;padding:5px 8px;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted)}.sourceview{flex:1}.notice{background:#573e14;color:#ffe1a3;padding:6px 9px;font-size:11px}.resize{position:absolute;z-index:5;touch-action:none}.resize.e,.resize.w{top:14px;bottom:14px;width:10px;cursor:ew-resize}.resize.e{right:-4px}.resize.w{left:-4px}.resize.n,.resize.s{height:10px;left:14px;right:14px;cursor:ns-resize}.resize.n{top:-4px}.resize.s{bottom:-4px}.resize.ne,.resize.nw,.resize.se,.resize.sw{width:18px;height:18px;z-index:6}.resize.ne{right:-4px;top:-4px;cursor:nesw-resize}.resize.nw{left:-4px;top:-4px;cursor:nwse-resize}.resize.se{right:-4px;bottom:-4px;cursor:nwse-resize}.resize.sw{left:-4px;bottom:-4px;cursor:nesw-resize}.ghost{position:fixed;z-index:2147483645;border:2px solid #70c5ff;background:#55aeef33;border-radius:10px;pointer-events:none;display:none;transition:all .18s}.wi.collapsed .tabs,.wi.collapsed .toolbar,.wi.collapsed .content,.wi.collapsed .status,.wi.collapsed .resize{display:none}.wi.collapsed{height:44px!important;min-height:44px!important;border-radius:10px}.wi.dock-left,.wi.dock-right{border-radius:0}.wi.dock-top,.wi.dock-bottom{border-radius:0}.wi.dock-top .title{order:2;border-top:1px solid var(--line);border-bottom:0}.wi.dock-top .tabs{order:0}.wi.dock-top .toolbar{order:1}.wi.dock-top .content{order:0}.wi.dock-bottom .title{order:0}.wi.dock-bottom .tabs{order:1}.wi.dock-bottom .toolbar{order:2}.wi.dock-bottom .content{order:3}/* Geometry already anchors vertical docks; translating during the height animation hides the title. */.wi.dock-top.collapsed,.wi.dock-bottom.collapsed{transform:none}.wi.dock-left.collapsed{transform:translateX(calc(-100% + 54px))}.wi.dock-right.collapsed{transform:translateX(calc(100% - 54px))}.wi.dock-left.collapsed .title [data-action="collapse"]{order:1}.wi.dock-right.collapsed .title [data-action="collapse"]{order:-1}.dialog{position:absolute;z-index:10;inset:0;background:#0009;display:grid;place-items:center;padding:16px}.dialogbox{width:min(440px,100%);max-height:90%;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;box-shadow:0 15px 55px #000b}.dialogbox h3{margin:0 0 10px}.dialogbox .actions{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}.footerhint{font-size:11px;color:var(--muted)}
       .fa-icon{display:inline-block;width:1em;height:1em;flex:none;fill:currentColor;pointer-events:none}
       .logo .fa-icon{width:14px;height:14px}.tree-row .twisty .fa-icon{width:10px;height:10px}.tree-row .twisty.leaf .fa-icon{width:4px;height:4px}
       .tree-row .hidden-indicator{color:var(--muted);margin-right:4px}
@@ -394,7 +396,7 @@
     const statusText = root.querySelector('#status-text');
     const originalConsole = {};
     const stateLocal = {
-      selected: null, selectedNodeRow: null, expanded: new WeakSet(), elementSearch: '', sourceSearch: '', sourceFindFrom: 0,
+      selected: null, selectedNodeRow: null, treeStart: 0, expanded: new WeakSet(), elementSearch: '', sourceSearch: '', sourceFindFrom: 0,
       filteredNodes: null, sourceText: '', sourceOverride: null, consoleEntries: [], commandHistory: [], historyIndex: 0,
       resourceType: state.lastResourceType || 'local', resourceEntries: [], resourceSelected: null,
       removed: null, hidden: new WeakMap(), picking: false, pickOverlay: null, pickPoint: null,
@@ -500,11 +502,10 @@
       return s;
     }
     function childElements(el) { return [...(el?.children || [])].filter(c => !excluded(c)); }
-    function makeRow(el, depth, parent) {
+    function makeRow(el, depth, parent, children = childElements(el)) {
       const row = document.createElement('div');
       row.className = 'tree-row'; row.dataset.element = 'true'; row.style.paddingLeft = `${5 + depth * 12}px`;
       row.setAttribute('role', 'treeitem'); row.setAttribute('aria-level', String(depth + 1));
-      const children = childElements(el);
       const toggle = document.createElement('button'); toggle.className = children.length ? 'twisty' : 'twisty leaf'; toggle.innerHTML = faIcon(children.length ? (stateLocal.expanded.has(el) ? 'chevron-down' : 'chevron-right') : 'circle');
       toggle.setAttribute('aria-label', children.length ? (stateLocal.expanded.has(el) ? 'Collapse element' : 'Expand element') : 'No children');
       toggle.disabled = !children.length;
@@ -521,30 +522,62 @@
       if (el === stateLocal.selected) row.classList.add('selected');
       row.addEventListener('click', () => selectElement(el));
       parent.appendChild(row);
-      return children;
+      return row;
     }
-    function renderTree() {
-      if (state.activeTab !== 'elements' || !tree) return;
-      tree.replaceChildren();
-      const rootEl = document.documentElement;
-      if (!rootEl) { tree.innerHTML = '<div class="empty">Document is not available.</div>'; return; }
-      let count = 0;
-      const stack = [{ el: rootEl, depth: 0 }];
-      while (stack.length && count < MAX_TREE_NODES) {
+    // Walking the expanded tree is cheap; creating rows is not. So the whole
+    // visible tree is listed, and only a window of MAX_TREE_NODES rows is drawn.
+    function visibleTreeNodes(rootEl) {
+      const items = [], stack = [{ el: rootEl, depth: 0 }];
+      while (stack.length) {
+        if (items.length >= MAX_TREE_SCAN) return { items, truncated: true };
         const { el, depth } = stack.pop();
         if (!el || excluded(el)) continue;
-        const children = makeRow(el, depth, tree); count++;
+        const children = childElements(el);
+        items.push({ el, depth, children });
         if (stateLocal.expanded.has(el)) for (let i = children.length - 1; i >= 0; i--) stack.push({ el: children[i], depth: depth + 1 });
       }
-      if (stack.length) { const more = document.createElement('div'); more.className = 'empty'; more.textContent = `Tree limited to ${MAX_TREE_NODES} visible nodes. Expand specific branches to inspect more.`; tree.appendChild(more); }
+      return { items, truncated: false };
+    }
+    function treeButton(action, text) {
+      const button = document.createElement('button'); button.className = 'tree-more'; button.dataset.action = action; button.textContent = text;
+      tree.appendChild(button);
+    }
+    // reveal: move the window so the selected element is drawn.
+    // anchor: an element whose row should stay put on screen across the redraw.
+    function renderTree({ reveal = false, anchor = null } = {}) {
+      if (state.activeTab !== 'elements' || !tree) return;
+      const anchorRow = anchor && stateLocal.treeRows?.get(anchor);
+      const anchorOffset = anchorRow ? anchorRow.getBoundingClientRect().top - tree.getBoundingClientRect().top : 0;
+      tree.replaceChildren(); stateLocal.treeRows = new Map();
+      const rootEl = document.documentElement;
+      if (!rootEl) { tree.innerHTML = '<div class="empty">Document is not available.</div>'; return; }
+      const { items, truncated } = visibleTreeNodes(rootEl);
+      const selectedIndex = stateLocal.selected ? items.findIndex(item => item.el === stateLocal.selected) : -1;
+      let start = stateLocal.treeStart;
+      if (reveal && selectedIndex >= 0 && (selectedIndex < start || selectedIndex >= start + MAX_TREE_NODES)) start = selectedIndex - TREE_PAGE;
+      start = stateLocal.treeStart = clamp(start, 0, Math.max(0, items.length - MAX_TREE_NODES));
+      const end = Math.min(items.length, start + MAX_TREE_NODES);
+      if (start > 0) treeButton('tree-earlier', `Show ${Math.min(TREE_PAGE, start)} earlier (${start} above)`);
+      for (let i = start; i < end; i++) stateLocal.treeRows.set(items[i].el, makeRow(items[i].el, items[i].depth, tree, items[i].children));
+      if (end < items.length) treeButton('tree-later', `Show ${Math.min(TREE_PAGE, items.length - end)} more (${items.length - end} below)`);
+      if (truncated) { const note = document.createElement('div'); note.className = 'empty'; note.textContent = `Only the first ${MAX_TREE_SCAN} expanded nodes are listed. Collapse branches to see the rest.`; tree.appendChild(note); }
+      const newAnchorRow = anchor && stateLocal.treeRows.get(anchor);
+      if (newAnchorRow) tree.scrollTop += newAnchorRow.getBoundingClientRect().top - tree.getBoundingClientRect().top - anchorOffset;
       if (stateLocal.selected && !stateLocal.selected.isConnected) { stateLocal.selected = null; renderDetails(); }
+    }
+    function shiftTreeWindow(direction) {
+      // Keep the row next to the clicked button where it was, so reading continues smoothly.
+      const rows = [...stateLocal.treeRows.keys()];
+      const anchor = direction < 0 ? rows[0] : rows[rows.length - 1];
+      stateLocal.treeStart += direction * TREE_PAGE;
+      renderTree({ anchor });
     }
     function selectElement(el) {
       if (!el || excluded(el)) return;
       stateLocal.selected = el;
       let p = el.parentElement;
       while (p && !excluded(p)) { stateLocal.expanded.add(p); p = p.parentElement; }
-      renderTree(); revealSelectedRow(); renderDetails(); updateSelectionHighlight(); ensureHighlightLoop();
+      renderTree({ reveal: true }); revealSelectedRow(); renderDetails(); updateSelectionHighlight(); ensureHighlightLoop();
     }
     function revealSelectedRow() {
       const row = tree.querySelector('.tree-row.selected');
@@ -1035,6 +1068,8 @@
         case 'refresh-element': renderDetails();renderTree();break;
         case 'expand-all': { const stack=[document.documentElement];let n=0;while(stack.length&&n++<2000){const el=stack.pop();if(!el||excluded(el))continue;stateLocal.expanded.add(el);childElements(el).forEach(c=>stack.push(c));}renderTree();setStatus('Expanded accessible document branches');break; }
         case 'undo-delete': undoDelete();break;
+        case 'tree-earlier': shiftTreeWindow(-1);break;
+        case 'tree-later': shiftTreeWindow(1);break;
         case 'search-elements': searchElements();break;
         case 'search-next': stepSearch(1);break;
         case 'search-prev': stepSearch(-1);break;
