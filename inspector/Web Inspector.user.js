@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Inspector
 // @namespace    https://github.com/iant89/userscripts
-// @version      0.9.0
+// @version      0.10.0
 // @description  A mobile-friendly, self-contained web inspector for the current page.
 // @match        *://*/*
 // @run-at       document-start
@@ -274,6 +274,7 @@
     "beautify": [576,512,"M263.4-27L278.2 9.8 315 24.6c3 1.2 5 4.2 5 7.4s-2 6.2-5 7.4L278.2 54.2 263.4 91c-1.2 3-4.2 5-7.4 5s-6.2-2-7.4-5L233.8 54.2 197 39.4c-3-1.2-5-4.2-5-7.4s2-6.2 5-7.4L233.8 9.8 248.6-27c1.2-3 4.2-5 7.4-5s6.2 2 7.4 5zM110.7 41.7l21.5 50.1 50.1 21.5c5.9 2.5 9.7 8.3 9.7 14.7s-3.8 12.2-9.7 14.7l-50.1 21.5-21.5 50.1c-2.5 5.9-8.3 9.7-14.7 9.7s-12.2-3.8-14.7-9.7L59.8 164.2 9.7 142.7C3.8 140.2 0 134.4 0 128s3.8-12.2 9.7-14.7L59.8 91.8 81.3 41.7C83.8 35.8 89.6 32 96 32s12.2 3.8 14.7 9.7zM464 304c6.4 0 12.2 3.8 14.7 9.7l21.5 50.1 50.1 21.5c5.9 2.5 9.7 8.3 9.7 14.7s-3.8 12.2-9.7 14.7l-50.1 21.5-21.5 50.1c-2.5 5.9-8.3 9.7-14.7 9.7s-12.2-3.8-14.7-9.7l-21.5-50.1-50.1-21.5c-5.9-2.5-9.7-8.3-9.7-14.7s3.8-12.2 9.7-14.7l50.1-21.5 21.5-50.1c2.5-5.9 8.3-9.7 14.7-9.7zM460 0c11 0 21.6 4.4 29.5 12.2l42.3 42.3C539.6 62.4 544 73 544 84s-4.4 21.6-12.2 29.5l-88.2 88.2-101.3-101.3 88.2-88.2C438.4 4.4 449 0 460 0zM44.2 398.5L308.4 134.3 409.7 235.6 145.5 499.8C137.6 507.6 127 512 116 512s-21.6-4.4-29.5-12.2L44.2 457.5C36.4 449.6 32 439 32 428s4.4-21.6 12.2-29.5z"],
     "download": [448,512,"M256 32c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 210.7-41.4-41.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l96 96c12.5 12.5 32.8 12.5 45.3 0l96-96c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L256 242.7 256 32zM64 320c-35.3 0-64 28.7-64 64l0 32c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-32c0-35.3-28.7-64-64-64l-46.9 0-56.6 56.6c-31.2 31.2-81.9 31.2-113.1 0L110.9 320 64 320zm304 56a24 24 0 1 1 0 48 24 24 0 1 1 0-48z"],
     "gear": [512,512,"M195.1 9.5C198.1-5.3 211.2-16 226.4-16l59.8 0c15.2 0 28.3 10.7 31.3 25.5L332 79.5c14.1 6 27.3 13.7 39.3 22.8l67.8-22.5c14.4-4.8 30.2 1.2 37.8 14.4l29.9 51.8c7.6 13.2 4.9 29.8-6.5 39.9L447 233.3c.9 7.4 1.3 15 1.3 22.7s-.5 15.3-1.3 22.7l53.4 47.5c11.4 10.1 14 26.8 6.5 39.9l-29.9 51.8c-7.6 13.1-23.4 19.2-37.8 14.4l-67.8-22.5c-12.1 9.1-25.3 16.7-39.3 22.8l-14.4 69.9c-3.1 14.9-16.2 25.5-31.3 25.5l-59.8 0c-15.2 0-28.3-10.7-31.3-25.5l-14.4-69.9c-14.1-6-27.2-13.7-39.3-22.8L73.5 432.3c-14.4 4.8-30.2-1.2-37.8-14.4L5.8 366.1c-7.6-13.2-4.9-29.8 6.5-39.9l53.4-47.5c-.9-7.4-1.3-15-1.3-22.7s.5-15.3 1.3-22.7L12.3 185.8c-11.4-10.1-14-26.8-6.5-39.9L35.7 94.1c7.6-13.2 23.4-19.2 37.8-14.4l67.8 22.5c12.1-9.1 25.3-16.7 39.3-22.8L195.1 9.5zM256.3 336a80 80 0 1 0 -.6-160 80 80 0 1 0 .6 160z"],
+    "locate": [384,512,"M0 188.6C0 84.4 86 0 192 0S384 84.4 384 188.6c0 119.3-120.2 262.3-170.4 316.8-11.8 12.8-31.5 12.8-43.3 0-50.2-54.5-170.4-197.5-170.4-316.8zM192 256a64 64 0 1 0 0-128 64 64 0 1 0 0 128z"],
   };
   // END GENERATED FONT AWESOME DATA
   function faIcon(name) {
@@ -352,12 +353,15 @@
       .tree-row .hidden-indicator{color:var(--muted);margin-right:4px}
       [data-action="pick"]{touch-action:none}
       .pickmask{position:fixed;inset:0;z-index:2147483644;cursor:crosshair;touch-action:none;pointer-events:auto}
-      .pickbox,.selectionbox{position:fixed;display:none;pointer-events:none;box-sizing:border-box}
+      .pickbox,.selectionbox,.locatebox{position:fixed;display:none;pointer-events:none;box-sizing:border-box}
+      .locatebox{z-index:2147483647;border:3px solid #ffcd70;border-radius:6px;background:#ffcd7026;box-shadow:0 0 0 4px #ffcd7040,0 0 26px 8px #ffcd7080;animation:wi-locate .55s ease-in-out infinite alternate}
+      @keyframes wi-locate{from{opacity:1}to{opacity:.4}}
+      .wi.see-through{opacity:.5!important;transition:opacity .2s}
       .pickbox{z-index:2147483645;background:rgba(134,239,172,.38);outline:1px solid rgba(34,197,94,.65)}
       .selectionbox{z-index:2147483646;border:2px solid #31b954;border-radius:5px;animation:wi-selection-pulse 1.6s ease-in-out infinite}
       @keyframes wi-selection-pulse{0%,100%{border-color:#31b954;box-shadow:0 0 0 0 rgba(49,185,84,.45)}50%{border-color:#72e991;box-shadow:0 0 0 5px rgba(49,185,84,.16)}}
       @media(max-width:600px){.wi{min-width:280px;border-radius:10px}.treepane{width:39%;min-width:100px}.context{display:none}.toolbar{min-height:40px}.toolbar button{min-width:38px}.tabs{gap:2px}.tab{padding:5px 8px}.resrow{grid-template-columns:minmax(75px,1fr) minmax(65px,1fr)}}
-      @media(prefers-reduced-motion:reduce){.wi,.ghost{transition:none!important}.selectionbox{animation:none;box-shadow:0 0 0 2px rgba(49,185,84,.2)}}
+      @media(prefers-reduced-motion:reduce){.wi,.ghost{transition:none!important}.selectionbox{animation:none;box-shadow:0 0 0 2px rgba(49,185,84,.2)}.locatebox{animation:none}}
     `;
 
     root.innerHTML = `<style>${css}</style>
@@ -378,7 +382,7 @@
         <main class="content">
           <section class="panel active" data-panel="elements"><div class="columns">
             <div class="treepane"><div class="subhead">Document tree <span class="spacer"></span><button data-action="expand-all" title="Expand document tree" aria-label="Expand document tree">${faIcon('expand-tree')}</button></div><div class="tree" id="tree"></div></div>
-            <div class="detailpane"><div class="subhead" id="selected-label">No element selected</div><div class="detail-actions"><button data-action="pick" title="Click or drag to pick an element from the page" aria-label="Pick an element from the page">${faIcon('pick')}</button><button data-action="visibility" title="Toggle selected element visibility" aria-label="Toggle selected element visibility">${faIcon('eye')}</button><button data-action="delete-element" title="Delete selected element (Undo available)" aria-label="Delete selected element">${faIcon('trash')}</button><button data-action="add-element" title="Add an element" aria-label="Add an element">${faIcon('plus')}</button><button data-action="refresh-element" title="Refresh selected element" aria-label="Refresh selected element">${faIcon('refresh')}</button></div>
+            <div class="detailpane"><div class="subhead" id="selected-label">No element selected</div><div class="detail-actions"><button data-action="pick" title="Click or drag to pick an element from the page" aria-label="Pick an element from the page">${faIcon('pick')}</button><button data-action="locate-element" title="Locate: scroll to the selected element and highlight it" aria-label="Locate selected element on the page">${faIcon('locate')}</button><button data-action="visibility" title="Toggle selected element visibility" aria-label="Toggle selected element visibility">${faIcon('eye')}</button><button data-action="delete-element" title="Delete selected element (Undo available)" aria-label="Delete selected element">${faIcon('trash')}</button><button data-action="add-element" title="Add an element" aria-label="Add an element">${faIcon('plus')}</button><button data-action="refresh-element" title="Refresh selected element" aria-label="Refresh selected element">${faIcon('refresh')}</button></div>
               <div class="scroll" id="details"><div class="empty">Select an element in the tree or use Pick Target.</div></div>
             </div>
           </div></section>
@@ -395,13 +399,14 @@
         </main>
         <div class="status"><span id="status-text" aria-live="polite">Ready</span><span class="right" id="status-right">No external requests</span></div>
         <div class="resize n" data-resize="n"></div><div class="resize s" data-resize="s"></div><div class="resize e" data-resize="e"></div><div class="resize w" data-resize="w"></div><div class="resize ne" data-resize="ne"></div><div class="resize nw" data-resize="nw"></div><div class="resize se" data-resize="se"></div><div class="resize sw" data-resize="sw"></div>
-      </div><div class="ghost"></div><div class="pickbox" aria-hidden="true"></div><div class="selectionbox" aria-hidden="true"></div>`;
+      </div><div class="ghost"></div><div class="pickbox" aria-hidden="true"></div><div class="selectionbox" aria-hidden="true"></div><div class="locatebox" aria-hidden="true"></div>`;
 
     const win = root.querySelector('.wi');
     const collapseButton = root.querySelector('[data-action="collapse"]');
     const ghost = root.querySelector('.ghost');
     const pickHighlight = root.querySelector('.pickbox');
     const selectionHighlight = root.querySelector('.selectionbox');
+    const locateHighlight = root.querySelector('.locatebox');
     const toolbar = root.querySelector('#toolbar');
     const tree = root.querySelector('#tree');
     const details = root.querySelector('#details');
@@ -594,6 +599,7 @@
     }
     function selectElement(el) {
       if (!el || excluded(el)) return;
+      if (el !== stateLocal.selected) stopLocate();
       stateLocal.selected = el;
       let p = el.parentElement;
       while (p && !excluded(p)) { stateLocal.expanded.add(p); p = p.parentElement; }
@@ -753,8 +759,71 @@
       if (box === pickHighlight && box.style.borderRadius !== computed.borderRadius) box.style.borderRadius = computed.borderRadius;
       if (box.style.display !== 'block') box.style.display = 'block';
     }
+    // Locate: bring the selected element into view and flash a highlight on it.
+    // While it overlaps the inspector, the inspector is faded so it shows through.
+    const LOCATE_DURATION = 2500, LOCATE_OUTSET = 4;
+    let locateRun = 0, locateFrame = 0, locateTimer = 0;
+    function stopLocate() {
+      locateRun++; cancelAnimationFrame(locateFrame); clearTimeout(locateTimer); locateFrame = 0;
+      locateHighlight.style.display = 'none'; win.classList.remove('see-through');
+    }
+    function rectsOverlap(a, b) { return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top; }
+    function visibleViewport() {
+      const vv = window.visualViewport, left = vv?.offsetLeft || 0, top = vv?.offsetTop || 0;
+      return { left, top, right: left + (vv?.width || innerWidth), bottom: top + (vv?.height || innerHeight) };
+    }
+    // Resolves once the element has stopped moving (smooth scrolling has ended).
+    function settled(el, run) {
+      return new Promise(resolve => {
+        let last = '', still = 0;
+        const began = performance.now();
+        const tick = () => {
+          if (run !== locateRun) return resolve(false);
+          const r = el.getBoundingClientRect(), key = `${r.left},${r.top}`;
+          still = key === last ? still + 1 : 0; last = key;
+          if (still >= 3 || performance.now() - began > 1500) resolve(true); else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+    }
+    async function locateElement() {
+      const el = stateLocal.selected;
+      if (!el?.isConnected) return setStatus('Select an element first');
+      stopLocate();
+      const run = locateRun, name = elementDescription(el);
+      if (!el.getClientRects().length) return setStatus(`${name} is not rendered (for example display: none), so it has no position on the page`);
+      const rect = el.getBoundingClientRect(), view = visibleViewport();
+      const fits = rect.width <= view.right - view.left && rect.height <= view.bottom - view.top;
+      const inside = rect.left >= view.left && rect.right <= view.right && rect.top >= view.top && rect.bottom <= view.bottom;
+      let scrolled = false;
+      if (!rectsOverlap(rect, view) || (fits && !inside)) {
+        const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+        setStatus(`Scrolling to ${name}…`);
+        el.scrollIntoView({ block: 'center', inline: 'center', behavior: smooth ? 'smooth' : 'auto' });
+        if (!(await settled(el, run))) return;
+        scrolled = true;
+      }
+      let faded = false;
+      const ends = performance.now() + LOCATE_DURATION;
+      const frame = () => {
+        if (run !== locateRun) return;
+        if (!el.isConnected || performance.now() >= ends) return stopLocate();
+        const r = el.getBoundingClientRect();
+        Object.assign(locateHighlight.style, {
+          display: 'block', left: `${r.left - LOCATE_OUTSET}px`, top: `${r.top - LOCATE_OUTSET}px`,
+          width: `${r.width + LOCATE_OUTSET * 2}px`, height: `${r.height + LOCATE_OUTSET * 2}px`,
+        });
+        const behind = !state.closed && rectsOverlap(r, win.getBoundingClientRect());
+        win.classList.toggle('see-through', behind);
+        faded ||= behind;
+        locateFrame = requestAnimationFrame(frame);
+      };
+      frame();
+      setStatus(`Located ${name}${scrolled ? ' (scrolled into view)' : ''}${faded ? ' · inspector faded while it is highlighted' : ''}`);
+    }
     function updateSelectionHighlight() {
-      if (win.classList.contains('closed')) selectionHighlight.style.display = 'none';
+      // The locate flash replaces the selection outline while it runs.
+      if (win.classList.contains('closed') || locateHighlight.style.display === 'block') selectionHighlight.style.display = 'none';
       else positionHighlight(selectionHighlight, stateLocal.selected, SELECTION_OUTSET);
     }
     function updatePickHighlight() {
@@ -796,6 +865,7 @@
     function preventPickScroll(e) { if (e.cancelable) e.preventDefault(); }
     function startPicker(pointerId = null) {
       if (stateLocal.picking) return;
+      stopLocate();
       stateLocal.picking = true; stateLocal.pickPointerId = pointerId; stateLocal.pickPoint = null;
       const overlay = document.createElement('div'); overlay.className = 'pickmask'; overlay.setAttribute('aria-hidden', 'true');
       root.appendChild(overlay); stateLocal.pickOverlay = overlay;
@@ -1691,6 +1761,7 @@
     function setInspectorClosed(closed, save = true) {
       state.closed = !!closed;
       if (state.closed && stateLocal.picking) cancelPicker();
+      if (state.closed) stopLocate();
       win.classList.toggle('closed', state.closed);
       if (state.closed) positionReopenButton();
       reopenButton.hidden = !state.closed;
@@ -1732,6 +1803,7 @@
         case 'close': setInspectorClosed(true);setStatus('Inspector hidden. Use the page button to reopen.');break;
         case 'pick': startPicker();break;
         case 'visibility': toggleVisibility();break;
+        case 'locate-element': locateElement();break;
         case 'delete-element': deleteElement();break;
         case 'add-element': addElementDialog();break;
         case 'refresh-element': renderDetails();renderTree();break;
@@ -1895,7 +1967,7 @@
 
     const api = {
       host, state, open:()=>setInspectorClosed(false),
-      destroy:()=>{safeSave();stopPicker();clearTimeout(stateLocal.pickClickTimer);clearTimeout(stateLocal.historyTimer);cancelAnimationFrame(stateLocal.highlightRaf);stateLocal.listeners.forEach(fn=>fn());for(const [name,fn] of Object.entries(originalConsole)){try{executionWindow.console[name]=fn}catch(_){}}if(options.saveEvent)document.dispatchEvent(new CustomEvent(options.saveEvent,{detail:'destroy'}));try{reopenButton.remove();host.remove();}catch(_){}},
+      destroy:()=>{safeSave();stopPicker();stopLocate();clearTimeout(stateLocal.pickClickTimer);clearTimeout(stateLocal.historyTimer);cancelAnimationFrame(stateLocal.highlightRaf);stateLocal.listeners.forEach(fn=>fn());for(const [name,fn] of Object.entries(originalConsole)){try{executionWindow.console[name]=fn}catch(_){}}if(options.saveEvent)document.dispatchEvent(new CustomEvent(options.saveEvent,{detail:'destroy'}));try{reopenButton.remove();host.remove();}catch(_){}},
     };
     window[INSTANCE_KEY]=api;
     if(promoteLocal)safeSave(true);
