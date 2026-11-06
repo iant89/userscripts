@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Inspector
 // @namespace    https://github.com/iant89/userscripts
-// @version      0.8.0
+// @version      0.9.0
 // @description  A mobile-friendly, self-contained web inspector for the current page.
 // @match        *://*/*
 // @run-at       document-start
@@ -67,6 +67,7 @@
         theme: 'dark', lastResourceType: value.lastResourceType,
         opacity: typeof value.opacity === 'boolean' ? value.opacity : true,
         rewriteUrls: typeof value.rewriteUrls === 'boolean' ? value.rewriteUrls : false,
+        rewriteScripts: typeof value.rewriteScripts === 'boolean' ? value.rewriteScripts : false,
         stripQuery: typeof value.stripQuery === 'boolean' ? value.stripQuery : false, updatedAt: value.updatedAt,
       };
     }
@@ -288,7 +289,7 @@
   const defaultState = {
     x: 18, y: 70, width: 720, height: 520, dock: 'float', collapsed: false, closed: false,
     activeTab: 'elements', theme: 'dark', lastResourceType: 'local', opacity: true,
-    rewriteUrls: false, stripQuery: false,
+    rewriteUrls: false, rewriteScripts: false, stripQuery: false,
   };
   const executionWindow = options.pageWindow || window;
   const executionTarget = options.isolated ? 'userscript' : 'page';
@@ -303,7 +304,7 @@
       if (Number.isFinite(value[key]) && Math.abs(value[key]) <= 1000000 && (!['width', 'height'].includes(key) || value[key] > 0)) result[key] = value[key];
     }
     if (['float', 'left', 'right', 'top', 'bottom'].includes(value.dock)) result.dock = value.dock;
-    for (const key of ['collapsed', 'closed', 'opacity', 'rewriteUrls', 'stripQuery']) if (typeof value[key] === 'boolean') result[key] = value[key];
+    for (const key of ['collapsed', 'closed', 'opacity', 'rewriteUrls', 'rewriteScripts', 'stripQuery']) if (typeof value[key] === 'boolean') result[key] = value[key];
     if (['elements', 'console', 'source', 'resources', 'settings'].includes(value.activeTab)) result.activeTab = value.activeTab;
     if (['local', 'session', 'cookie'].includes(value.lastResourceType)) result.lastResourceType = value.lastResourceType;
     if (value.theme === 'dark') result.theme = value.theme;
@@ -386,7 +387,8 @@
           <section class="panel resourcepanel" data-panel="resources"><div class="resource-type" role="tablist" aria-label="Storage type"><button data-resource="local" aria-pressed="true">Local</button><button data-resource="session" aria-pressed="false">Session</button><button data-resource="cookie" aria-pressed="false">Cookies</button></div><div class="toolbar" style="border-bottom:1px solid var(--line)"><input class="field small filterbox" id="resource-filter" placeholder="Filter resources" aria-label="Filter resources"><span class="spacer"></span><button data-action="resource-copy" title="Copy selected resource" aria-label="Copy selected resource">${faIcon('copy')}</button><button data-action="resource-view" title="View selected value in Source" aria-label="View selected value in Source">${faIcon('file-lines')}</button><button data-action="resource-delete" title="Delete selected resource" aria-label="Delete selected resource">${faIcon('trash')}</button><button data-action="resource-clean" title="Clear this storage category" aria-label="Clear this storage category">${faIcon('broom')}</button><button data-action="resource-refresh" title="Refresh resources" aria-label="Refresh resources">${faIcon('refresh')}</button></div><div class="reslist" id="reslist"></div><div class="status" id="resource-status">Accessible storage for this origin</div></section>
           <section class="panel settingspanel" data-panel="settings"><div class="scroll settings">
             <h4 class="settings-head">All files export</h4>
-            <label class="setting"><input type="checkbox" data-setting="rewriteUrls"><span><strong>Rewrite URLs to the saved copies</strong><span class="hint">In the ZIP, links in the saved page and its stylesheets point to the downloaded files, so the page opens offline. Links to files that weren't saved are made absolute so they still work online. Scripts are saved unchanged.</span></span></label>
+            <label class="setting"><input type="checkbox" data-setting="rewriteUrls"><span><strong>Rewrite URLs to the saved copies</strong><span class="hint">In the ZIP, links in the saved page and its stylesheets point to the downloaded files, so the page opens offline. Links to files that weren't saved are made absolute so they still work online.</span></span></label>
+            <label class="setting"><input type="checkbox" data-setting="rewriteScripts"><span><strong>Rewrite URLs in scripts</strong><span class="hint">Also point URLs inside the page's inline scripts and saved .js files at the downloaded files, including URLs built in code whose value was resolved. Only URLs of saved files are changed; other strings are left alone. Paths are relative to the saved page, where scripts resolve them.</span></span></label>
             <label class="setting"><input type="checkbox" data-setting="stripQuery"><span><strong>Remove variables from saved URLs</strong><span class="hint">Save files without the query part of their URL: data.json?v=2&amp;token=abc is saved as data.json, and rewritten links use that name. Files are still downloaded from the full URL.</span></span></label>
             <div class="footerhint">Settings are saved with the inspector's window preferences.</div>
           </div></section>
@@ -424,7 +426,7 @@
         x: state.x, y: state.y, width: state.width, height: state.height, dock: state.dock,
         collapsed: !!state.collapsed, closed: !!state.closed, activeTab: state.activeTab,
         theme: state.theme, lastResourceType: stateLocal.resourceType, opacity: !!state.opacity,
-        rewriteUrls: !!state.rewriteUrls, stripQuery: !!state.stripQuery,
+        rewriteUrls: !!state.rewriteUrls, rewriteScripts: !!state.rewriteScripts, stripQuery: !!state.stripQuery,
       };
     }
     let lastSavedValues = JSON.stringify(preferenceValues());
@@ -1228,8 +1230,9 @@
       const urls = loadedUrls().filter(u => pattern.test(u) || pattern.test(u.replace(/#.*$/, '')));
       return urls.length && urls.length <= 10 ? { urls, how: 'matched a URL the page loaded' } : { urls: [] };
     }
-    // Script text: URL strings, "+" concatenations and template literals.
-    function scanJs(scan, js, base, from, corpus) {
+    // URL expressions in script text: a URL string, optionally continued by
+    // "+" operands, or a template literal. Shared by scanning and rewriting.
+    function* jsUrlExpressions(js) {
       const literals = new RegExp(JS_STRING.source, 'g');
       let m;
       while ((m = literals.exec(js))) {
@@ -1254,9 +1257,13 @@
           parts.push(operand.part); end = operand.end;
         }
         literals.lastIndex = end;
+        yield { start, end, parts, quote: m[3] !== undefined ? '`' : m[1], dynamic: parts.some(p => p.lit === undefined) };
+      }
+    }
+    function scanJs(scan, js, base, from, corpus) {
+      for (const { start, end, parts, dynamic } of jsUrlExpressions(js)) {
         const code = shortCode(js.slice(start, end));
         const method = requestMethod(js, start, end);
-        const dynamic = parts.some(p => p.lit === undefined);
         if (method && method !== 'GET') {
           if (dynamic) addNote(scan, `${method} ${code} (in ${from}): not downloaded, only GET requests are fetched`);
           else blockUrl(scan, parts.map(p => p.lit).join(''), base, method, from);
@@ -1343,7 +1350,26 @@
         })
         .replace(/(@import\s+)(["'])([^"']+)\2/gi, (m, at, quote, value) => `${at}${quote}${rewriteReference(value, base, saved, fromPath)}${quote}`);
     }
-    function rewriteHtmlText(html, base, saved, fromPath) {
+    // Script URLs resolve against the page, so `fromPath` is the saved page.
+    // Only expressions whose value is a saved file are replaced; other strings
+    // are left alone so non-URL text (routes, patterns) is never altered.
+    function rewriteJsText(js, base, saved, fromPath, corpus) {
+      let out = '', last = 0;
+      for (const { start, end, parts, quote, dynamic } of jsUrlExpressions(js)) {
+        let value;
+        if (!dynamic) value = parts.map(p => p.lit).join('');
+        else { const { urls } = resolveParts(parts, base, corpus); if (urls.length !== 1) continue; value = urls[0]; }
+        let url; try { url = new URL(value, base); } catch (_) { continue; }
+        const hash = url.hash; url.hash = '';
+        const path = saved.get(url.href);
+        if (!path) continue;
+        const relative = relativePath(fromPath, path) + hash;
+        out += js.slice(last, start) + quote + relative.replace(/\\/g, '\\\\').split(quote).join(`\\${quote}`) + quote;
+        last = end;
+      }
+      return out + js.slice(last);
+    }
+    function rewriteHtmlText(html, base, saved, fromPath, scripts = null) {
       const attributes = (tag, text) => text.replace(/([^\s="'\/>]+)(\s*=\s*)(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g, (m, name, eq, dq, sq, bare) => {
         const lower = name.toLowerCase(), value = decodeEntities(dq ?? sq ?? bare);
         let next;
@@ -1356,7 +1382,10 @@
       });
       return html.replace(/(<script\b)([^>]*>)([\s\S]*?<\/script>)|(<style\b)([^>]*>)([\s\S]*?)(<\/style>)|<([a-zA-Z][\w:-]*)\b([^>]*)>/gi,
         (m, sOpen, sAttrs, sRest, stOpen, stAttrs, stBody, stClose, tag, tagAttrs) => {
-          if (sOpen) return sOpen + attributes('script', sAttrs) + sRest;
+          if (sOpen) {
+            const body = sRest.slice(0, -'</script>'.length);
+            return sOpen + attributes('script', sAttrs) + (scripts ? rewriteJsText(body, base, saved, fromPath, scripts.corpus) : body) + sRest.slice(-'</script>'.length);
+          }
           if (stOpen) return stOpen + attributes('style', stAttrs) + rewriteCssText(stBody, base, saved, fromPath) + stClose;
           const lower = tag.toLowerCase(), rewritten = attributes(lower, tagAttrs);
           return `<${tag}${lower === 'base' ? rewritten.replace(/\s+$/, '') : rewritten}>`;
@@ -1402,7 +1431,8 @@
       const corpus = scan.scripts.map(s => s.text).join('\n;\n');
       for (const script of scan.scripts) scanJs(scan, script.text, script.base, script.from, corpus);
       for (const href of scan.blocked) scan.found.delete(href);
-      return { urls: [...scan.found.values()], notes: scan.notes, scannedFiles: files.length, stylesheets: new Set([...scan.scannable].filter(([, type]) => type === 'css').map(([href]) => href)) };
+      const ofType = kind => new Set([...scan.scannable].filter(([, type]) => type === kind).map(([href]) => href));
+      return { urls: [...scan.found.values()], notes: scan.notes, scannedFiles: files.length, stylesheets: ofType('css'), scriptFiles: ofType('js'), corpus };
     }
     function openExportAllDialog() {
       const source = currentSource();
@@ -1427,14 +1457,14 @@
       const cache = new Map();
       const fetchCached = href => { if (!cache.has(href)) cache.set(href, fetchBytes(href, controller.signal)); return cache.get(href); };
       const show = text => { progress.textContent = text; setStatus(text, 'Fetching files on request'); };
-      scanForExport(source, fetchCached, controller.signal, show).then(({ urls, notes, scannedFiles, stylesheets }) => {
+      scanForExport(source, fetchCached, controller.signal, show).then(({ urls, notes, scannedFiles, stylesheets, scriptFiles, corpus }) => {
         if (controller.signal.aborted) return;
         progress.textContent = '';
         setStatus('Choose the files to export', 'Fetching files on request');
         const shown = urls.slice(0, MAX_EXPORT_URLS);
         intro.textContent = `Found ${urls.length} URL${urls.length === 1 ? '' : 's'} in the source${scannedFiles ? ` and ${scannedFiles} script/stylesheet file${scannedFiles === 1 ? '' : 's'}` : ''}${urls.length > shown.length ? ` (showing the first ${shown.length})` : ''}. Checked files are fetched by this page and saved with the source in a ZIP. Files on other sites download only if they allow cross-origin access; anything that fails is listed in download-report.txt.`;
         const options = document.createElement('div'); options.className = 'footerhint exportsettings';
-        options.textContent = `Links in the saved copy: ${state.rewriteUrls ? 'rewritten to the downloaded files' : 'kept as they are'} · Saved names: ${state.stripQuery ? 'without URL variables' : 'with URL variables'} (change in Settings)`;
+        options.textContent = `Links in the saved copy: ${state.rewriteUrls ? 'rewritten to the downloaded files' : 'kept as they are'} · Script URLs: ${state.rewriteScripts ? 'rewritten' : 'kept as they are'} · Saved names: ${state.stripQuery ? 'without URL variables' : 'with URL variables'} (change in Settings)`;
         intro.after(options);
         const boxes = [];
         const updateCount = () => { const n = boxes.filter(c => c.checked).length; start.textContent = n ? `Download ZIP (${n} file${n === 1 ? '' : 's'})` : 'Download ZIP (source only)'; };
@@ -1471,7 +1501,7 @@
           const chosen = boxes.filter(c => c.checked).map(c => c.value);
           box.querySelectorAll('input').forEach(c => { c.disabled = true; }); start.disabled = true;
           const used = new Set(), entries = [], report = [], saved = new Map();
-          const rewrite = !!state.rewriteUrls, stripQuery = !!state.stripQuery;
+          const rewrite = !!state.rewriteUrls, rewriteScripts = !!state.rewriteScripts, stripQuery = !!state.stripQuery;
           const sourceFile = `${safeFilename(source.name)}.${source.extension}`; used.add(sourceFile.toLowerCase());
           let done = 0, failed = 0, bytes = 0;
           const tick = () => show(`Fetched ${done} of ${chosen.length}${failed ? ` · ${failed} failed` : ''}`);
@@ -1487,17 +1517,20 @@
           }, controller.signal);
           if (controller.signal.aborted) return;
           let sourceText = source.text;
-          if (rewrite) {
-            if (source.extension === 'html') sourceText = rewriteHtmlText(sourceText, document.baseURI, saved, sourceFile);
-            for (const entry of entries) {
-              let isCss = stylesheets.has(entry.href);
-              try { isCss ||= /\.css$/i.test(new URL(entry.href).pathname); } catch (_) {}
-              if (isCss) entry.data = rewriteCssText(new TextDecoder().decode(entry.data), entry.href, saved, entry.path);
-            }
+          const scripts = rewriteScripts ? { corpus } : null;
+          if (source.extension === 'html' && (rewrite || rewriteScripts)) {
+            // With only script rewriting on, markup outside scripts keeps its URLs.
+            sourceText = rewrite ? rewriteHtmlText(sourceText, document.baseURI, saved, sourceFile, scripts)
+              : sourceText.replace(/(<script\b[^>]*>)([\s\S]*?)(<\/script>)/gi, (m, open, body, close) => open + rewriteJsText(body, document.baseURI, saved, sourceFile, corpus) + close);
+          } else if (rewriteScripts && source.extension !== 'html') sourceText = rewriteJsText(sourceText, document.baseURI, saved, sourceFile, corpus);
+          for (const entry of entries) {
+            let pathname = ''; try { pathname = new URL(entry.href).pathname; } catch (_) {}
+            if (rewrite && (stylesheets.has(entry.href) || /\.css$/i.test(pathname))) entry.data = rewriteCssText(new TextDecoder().decode(entry.data), entry.href, saved, entry.path);
+            else if (rewriteScripts && (scriptFiles.has(entry.href) || /\.m?js$/i.test(pathname))) entry.data = rewriteJsText(new TextDecoder().decode(entry.data), document.baseURI, saved, sourceFile, corpus);
           }
           entries.unshift({ path: sourceFile, data: sourceText });
           const notesText = notes.length ? `\n\nNot included:\n${notes.map(n => `  ${n}`).join('\n')}` : '';
-          const settingsText = `Links: ${rewrite ? 'rewritten to the saved copies (page source and stylesheets)' : 'unchanged'}\nSaved names: ${stripQuery ? 'URL variables (query strings) removed' : 'URL variables kept as a short hash'}`;
+          const settingsText = `Links: ${rewrite ? 'rewritten to the saved copies (page source and stylesheets)' : 'unchanged'}\nScript URLs: ${rewriteScripts ? 'rewritten to the saved copies (inline and saved scripts)' : 'unchanged'}\nSaved names: ${stripQuery ? 'URL variables (query strings) removed' : 'URL variables kept as a short hash'}`;
           entries.push({ path: 'download-report.txt', data: `Exported from ${location.href}\n${new Date().toISOString()}\nSource: ${sourceFile}\nFiles: ${chosen.length - failed} saved, ${failed} failed\n${settingsText}\n\n${report.join('\n')}${notesText}\n` });
           const zipName = `${safeFilename(source.name)}-files.zip`;
           try { downloadBlob(buildZip(entries), zipName); setStatus(`Exported ${zipName}: ${chosen.length - failed} file${chosen.length - failed === 1 ? '' : 's'} saved${failed ? `, ${failed} failed (see download-report.txt)` : ''}`, `Fetched ${chosen.length} file${chosen.length === 1 ? '' : 's'} on request`); }

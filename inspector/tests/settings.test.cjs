@@ -23,13 +23,18 @@ const html = `<!doctype html><html><head><link rel="icon" href="data:,">
   <body><p id="styled">Styled</p>
   <img id="logo" src="/img/logo.png?v=3" srcset="/img/logo.png?v=3 1x, /img/logo@2x.png 2x" alt="">
   <div id="banner" style="background-image: url('/img/banner.png'); width: 1px; height: 1px"></div>
-  <a id="about" href="/about">About</a><a id="top" href="#top">Top</a></body></html>`;
+  <a id="about" href="/about">About</a><a id="top" href="#top">Top</a><img id="dyn" alt="">
+  <script>var imageName = "bg"; const route = "/users/:id"; const about = "/about";
+    document.getElementById('dyn').src = "/img/" + imageName + ".png";</script>
+  <script src="/js/app.js"></script></body></html>`;
 const assets = {
   'https://site.test/css/site.css': ['text/css', '#styled { color: rgb(1, 2, 3) } body { background: url("../img/bg.png") }'],
   'https://site.test/img/logo.png?v=3': ['image/png', png],
   'https://site.test/img/logo@2x.png': ['image/png', png],
   'https://site.test/img/banner.png': ['image/png', png],
   'https://site.test/img/bg.png': ['image/png', png],
+  'https://site.test/js/app.js': ['text/javascript', 'const list = "/data/list.json"; const spa = "/about";'],
+  'https://site.test/data/list.json': ['application/json', '[1,2]'],
 };
 
 async function fixture(t) {
@@ -59,6 +64,7 @@ async function exportAll(page, inspector) {
   await inspector.locator('[data-action="export-source"]').click();
   await inspector.locator('[data-action="export-all-files"]').click();
   await inspector.locator('[data-export-start]:not([disabled])').waitFor();
+  await inspector.locator('.urlrow', { hasText: '/data/list.json' }).locator('input').check();
   const [download] = await Promise.all([page.waitForEvent('download'), inspector.locator('[data-export-start]').click()]);
   return fs.readFileSync(await download.path());
 }
@@ -90,8 +96,10 @@ test('without the settings, the saved source and names are unchanged', async t =
   const source = files.get('site.test.html');
   assert.ok(source.includes('<link rel="stylesheet" href="/css/site.css">'));
   assert.ok(source.includes('<base href="https://site.test/">'));
+  assert.ok(source.includes('"/img/" + imageName + ".png"'));
+  assert.equal(files.get('files/site.test/js/app.js'), 'const list = "/data/list.json"; const spa = "/about";');
   assert.ok([...files.keys()].some(name => /^files\/site\.test\/img\/logo_[0-9a-f]+\.png$/.test(name)), [...files.keys()].join('\n'));
-  assert.match(files.get('download-report.txt'), /Links: unchanged\nSaved names: URL variables kept as a short hash/);
+  assert.match(files.get('download-report.txt'), /Links: unchanged\nScript URLs: unchanged\nSaved names: URL variables kept as a short hash/);
 });
 
 test('Remove variables saves files without their query string', async t => {
@@ -104,7 +112,7 @@ test('Remove variables saves files without their query string', async t => {
 
 test('Rewrite URLs points the saved page and stylesheets at the saved copies', async t => {
   const { page, inspector } = await fixture(t);
-  await setSettings(inspector, { rewriteUrls: true, stripQuery: true });
+  await setSettings(inspector, { rewriteUrls: true, rewriteScripts: true, stripQuery: true });
   const zip = await exportAll(page, inspector);
   const files = readZip(zip);
   const source = files.get('site.test.html');
@@ -134,5 +142,19 @@ test('Rewrite URLs points the saved page and stylesheets at the saved copies', a
   await copy.waitForLoadState('load');
   assert.equal(await copy.locator('#styled').evaluate(el => getComputedStyle(el).color), 'rgb(1, 2, 3)');
   assert.equal(await copy.locator('#logo').evaluate(img => img.naturalWidth), 1);
+  // The inline script sets this image's URL at runtime; it was rewritten too.
+  assert.equal(await copy.locator('#dyn').evaluate(img => img.naturalWidth), 1);
   assert.deepEqual(remote, []);
+});
+
+test('Rewrite URLs in scripts changes only script URLs of saved files', async t => {
+  const { page, inspector } = await fixture(t);
+  await setSettings(inspector, { rewriteScripts: true });
+  const files = readZip(await exportAll(page, inspector));
+  const source = files.get('site.test.html');
+  assert.ok(source.includes('document.getElementById(\'dyn\').src = "files/site.test/img/bg.png";'), source);
+  assert.ok(source.includes('const route = "/users/:id"; const about = "/about";'), 'strings that are not saved files are untouched');
+  assert.ok(source.includes('<link rel="stylesheet" href="/css/site.css">'), 'markup is untouched without Rewrite URLs');
+  assert.equal(files.get('files/site.test/js/app.js'), 'const list = "files/site.test/data/list.json"; const spa = "/about";');
+  assert.match(files.get('download-report.txt'), /Script URLs: rewritten to the saved copies/);
 });
