@@ -1,0 +1,11 @@
+{
+  "name": "arena-userscripts",
+  "private": true,
+  "description": "Zero-runtime-dependency Arena userscripts and local verification tools.",
+  "scripts": {
+    "test": "node --test tests/arena-pro.test.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^30.1.3"
+  }
+}
