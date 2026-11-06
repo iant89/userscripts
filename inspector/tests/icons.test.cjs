@@ -31,6 +31,8 @@ const definitions = {
   'chevron-right': solid.faChevronRight,
   circle: solid.faCircle,
   undo: solid.faRotateLeft,
+  beautify: solid.faWandMagicSparkles,
+  download: solid.faDownload,
 };
 let browser;
 
@@ -139,6 +141,8 @@ test('controls use labeled, decorative Font Awesome icons with official paths', 
     ['[data-action="execute"]', 'Execute command', 'play'],
     ['.sourcebar [data-action="copy-source"]', 'Copy source', 'copy'],
     ['[data-action="refresh-source"]', 'Refresh source', 'refresh'],
+    ['[data-action="beautify-source"]', 'Beautify source', 'beautify'],
+    ['[data-action="export-source"]', 'Export source', 'download'],
     ['[data-action="resource-copy"]', 'Copy selected resource', 'copy'],
     ['[data-action="resource-view"]', 'View selected value in Source', 'file-lines'],
     ['[data-action="resource-delete"]', 'Delete selected resource', 'trash'],
