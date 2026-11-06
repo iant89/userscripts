@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Inspector
 // @namespace    https://github.com/iant89/userscripts
-// @version      0.10.0
+// @version      0.11.0
 // @description  A mobile-friendly, self-contained web inspector for the current page.
 // @match        *://*/*
 // @run-at       document-start
@@ -68,7 +68,10 @@
         opacity: typeof value.opacity === 'boolean' ? value.opacity : true,
         rewriteUrls: typeof value.rewriteUrls === 'boolean' ? value.rewriteUrls : false,
         rewriteScripts: typeof value.rewriteScripts === 'boolean' ? value.rewriteScripts : false,
-        stripQuery: typeof value.stripQuery === 'boolean' ? value.stripQuery : false, updatedAt: value.updatedAt,
+        stripQuery: typeof value.stripQuery === 'boolean' ? value.stripQuery : false,
+        treeSplit: Number.isFinite(value.treeSplit) && value.treeSplit >= 0.1 && value.treeSplit <= 0.9 ? value.treeSplit : 0.42,
+        collapsedSections: Array.isArray(value.collapsedSections) ? value.collapsedSections.filter(k => ['attributes', 'text', 'html'].includes(k)) : [],
+        updatedAt: value.updatedAt,
       };
     }
     function journalTime(name) {
@@ -290,7 +293,7 @@
   const defaultState = {
     x: 18, y: 70, width: 720, height: 520, dock: 'float', collapsed: false, closed: false,
     activeTab: 'elements', theme: 'dark', lastResourceType: 'local', opacity: true,
-    rewriteUrls: false, rewriteScripts: false, stripQuery: false,
+    rewriteUrls: false, rewriteScripts: false, stripQuery: false, treeSplit: 0.42, collapsedSections: [],
   };
   const executionWindow = options.pageWindow || window;
   const executionTarget = options.isolated ? 'userscript' : 'page';
@@ -308,6 +311,8 @@
     for (const key of ['collapsed', 'closed', 'opacity', 'rewriteUrls', 'rewriteScripts', 'stripQuery']) if (typeof value[key] === 'boolean') result[key] = value[key];
     if (['elements', 'console', 'source', 'resources', 'settings'].includes(value.activeTab)) result.activeTab = value.activeTab;
     if (['local', 'session', 'cookie'].includes(value.lastResourceType)) result.lastResourceType = value.lastResourceType;
+    if (Number.isFinite(value.treeSplit) && value.treeSplit >= 0.1 && value.treeSplit <= 0.9) result.treeSplit = value.treeSplit;
+    if (Array.isArray(value.collapsedSections)) result.collapsedSections = [...new Set(value.collapsedSections.filter(k => ['attributes', 'text', 'html'].includes(k)))];
     if (value.theme === 'dark') result.theme = value.theme;
     if (Number.isFinite(value.updatedAt) && value.updatedAt >= 0 && value.updatedAt <= Date.now() + 86400000) result.updatedAt = value.updatedAt;
     return Object.keys(result).length ? result : null;
@@ -344,10 +349,10 @@
         position:fixed;left:0;top:0;width:720px;height:520px;max-width:calc(100vw - 12px);max-height:calc(100vh - 12px);min-width:300px;min-height:140px;
         display:flex;flex-direction:column;background:var(--bg);color:var(--text);border:1px solid #526175;border-radius:12px;box-shadow:0 16px 56px #0009;
         font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden;pointer-events:auto;opacity:1;transition:opacity .2s, transform .22s,width .2s,height .2s;isolation:isolate;}
-      .wi.idle{opacity:.76}.wi.dragging,.wi.resizing{transition:none;opacity:1}.wi.closed{display:none}
+      .wi:focus{outline:none}.wi.idle{opacity:.76}.wi.dragging,.wi.resizing{transition:none;opacity:1}.wi.closed{display:none}
       .title{height:44px;min-height:44px;display:flex;align-items:center;gap:8px;padding:0 8px 0 12px;background:linear-gradient(110deg,#26364b,#1c2634);border-bottom:1px solid var(--line);touch-action:none;user-select:none;cursor:grab}
       .title:active{cursor:grabbing}.brand{display:flex;align-items:center;gap:8px;min-width:0;flex:1}.logo{width:24px;height:24px;border-radius:7px;background:#388bd0;display:grid;place-items:center;font-weight:800;color:white}.titletext{font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.context{color:var(--muted);font-size:11px;margin-left:3px}
-      button{font:inherit;color:inherit;border:1px solid transparent;background:transparent;border-radius:7px;min-width:36px;height:34px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 8px}button:hover{background:#ffffff12;border-color:#ffffff14}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}.icon{font-size:16px;line-height:1}.title button{width:38px;height:38px;font-size:18px}.close:hover{background:#9f3942}.tabs{display:flex;gap:4px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow:auto;scrollbar-width:thin}.tab{white-space:nowrap;color:var(--muted);padding:5px 11px}.tab[aria-selected="true"]{color:var(--text);background:#2d4056;border-color:#47607c}.toolbar{display:flex;align-items:center;gap:4px;min-height:42px;padding:4px 8px;background:#141a23;border-bottom:1px solid var(--line);overflow:auto}.toolbar .spacer{flex:1}.toolbar button{min-width:36px}.content{position:relative;display:flex;flex:1;min-height:0;overflow:hidden}.panel{display:none;flex:1;min-height:0;min-width:0}.panel.active{display:flex}.columns{display:flex;flex:1;min-width:0;min-height:0}.treepane{width:42%;min-width:115px;border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}.detailpane{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}.subhead{padding:6px 9px;color:var(--muted);font-size:11px;letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}.tree,.scroll{overflow:auto;overscroll-behavior:contain;min-height:0;flex:1;padding:6px}.tree{display:grid;grid-template-columns:minmax(max-content,1fr);align-content:start}.tree-row{box-sizing:border-box;height:auto;min-height:25px;display:flex;align-items:center;gap:4px;padding:2px 5px;border-radius:5px;white-space:nowrap;cursor:pointer;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.tree-row:hover{background:#ffffff0a}.tree-row.selected{background:#23507a;color:#fff}.tree-row .twisty{width:18px;min-width:18px;height:22px;padding:0;color:var(--muted)}.tree-row .twisty,.tree-row .tag{flex-shrink:0}.tree-more{justify-self:start;height:28px;margin:4px 2px;color:var(--accent);font-size:12px;border-color:var(--line)}.tree-row .tag{color:#7ec8ff}.tree-row .meta{color:#b3becb}.muted{color:var(--muted)}.empty{padding:18px;color:var(--muted);text-align:center}.field{width:100%;background:#0d1118;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:7px 8px;font:inherit}.field.small{padding:5px 7px}.field,textarea,select{font-size:14px}.editor{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical;min-height:60px;max-height:35%;tab-size:2}.label{font-size:11px;color:var(--muted);margin:9px 0 4px}.detail-actions{display:flex;gap:5px;flex-wrap:wrap;padding:7px;border-bottom:1px solid var(--line)}.htmlview,.sourceview{margin:0;white-space:pre;overflow:auto;flex:1;padding:10px;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;tab-size:2;color:#d7e2ef}.tok-tag{color:#76c7ff}.tok-attr{color:#c6a0f6}.tok-str{color:#a7dc8b}.tok-comment{color:#718096}.tok-text{color:#d7e2ef}.tok-key{color:#f0c674}.tok-num{color:#ef9f76}.tok-punc{color:#b9c5d3}.status{min-height:24px;padding:3px 9px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:center}.status .right{margin-left:auto}.consolepanel{flex-direction:column}.consolelog{flex:1;min-height:0;overflow:auto;padding:5px}.entry{padding:5px 8px;border-bottom:1px solid #ffffff0b;white-space:pre-wrap;overflow-wrap:anywhere}.entry.warn{background:#7d5b1b22}.entry.error{background:#842d3828}.entry.debug{color:#b1a5cf}.entry .stamp{color:#8594a7;font-size:10px;margin-right:7px}.entry .kind{font-weight:700;margin-right:6px}.command-area{border-top:1px solid var(--line);padding:7px;display:flex;gap:7px;align-items:flex-end}.command-area textarea{flex:1;min-height:40px;max-height:125px;resize:vertical;font:13px/1.4 ui-monospace,monospace}.resourcepanel{flex-direction:column}.resource-type{display:flex;padding:6px 8px;gap:4px;border-bottom:1px solid var(--line)}.resource-type button[aria-pressed="true"]{background:#2d4056}.reslist{flex:1;min-height:0;overflow:auto}.resrow{display:grid;grid-template-columns:minmax(90px,1fr) minmax(80px,2fr);gap:8px;padding:7px 9px;border-bottom:1px solid #ffffff0a;cursor:pointer}.resrow:hover{background:#ffffff0a}.resrow.selected{background:#23507a}.reskey,.resvalue{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.reskey{font:12px ui-monospace,monospace;color:#a9d5ff}.resvalue{color:var(--muted)}.filterbox{width:150px}.sourcepanel{flex-direction:column}.sourcebar{display:flex;align-items:center;gap:7px;padding:5px 8px;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted)}.sourceview{flex:1}.sourcebar button[aria-pressed="true"]{background:#2d4056;border-color:#47607c}.menu{position:absolute;z-index:9;width:250px;max-width:calc(100% - 16px);display:flex;flex-direction:column;gap:2px;padding:4px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px #000a}.menu button{height:auto;flex-direction:column;align-items:flex-start;gap:1px;padding:7px 10px;text-align:left}.menu .hint{font-size:11px;color:var(--muted)}.dialogbox.wide{width:min(640px,100%)}.dialogbox.wide .actions{position:sticky;bottom:-14px;margin:12px -14px -14px;padding:10px 14px;background:var(--panel);border-top:1px solid var(--line)}.urlgroup{margin-top:10px}.urlgroup-head{display:flex;align-items:center;gap:6px;font-weight:600;font-size:12px}.urllist{max-height:180px;overflow:auto;margin-top:4px;padding:3px;border:1px solid var(--line);border-radius:6px;background:#0d1118}.urlrow{display:flex;gap:6px;align-items:flex-start;padding:2px 4px;font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}.urlrow input,.urlgroup-head input{margin:2px 0 0;flex:none}.urlinfo{color:var(--muted);font-size:10.5px}.urlnotes summary{cursor:pointer;font-weight:600;font-size:12px}.urlnotes .urlrow{color:var(--muted)}.exportprogress{margin-top:10px;font-size:12px;color:var(--muted);min-height:1.4em}.settingspanel{flex-direction:column}.settings{display:flex;flex-direction:column;gap:8px;padding:12px}.settings-head{margin:0 0 2px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}.setting{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer}.setting:hover{border-color:#47607c}.setting input{margin:3px 0 0;flex:none;width:16px;height:16px;accent-color:var(--accent)}.setting .hint{display:block;margin-top:3px;font-size:12px;color:var(--muted)}.notice{background:#573e14;color:#ffe1a3;padding:6px 9px;font-size:11px}.resize{position:absolute;z-index:5;touch-action:none}.resize.e,.resize.w{top:14px;bottom:14px;width:10px;cursor:ew-resize}.resize.e{right:-4px}.resize.w{left:-4px}.resize.n,.resize.s{height:10px;left:14px;right:14px;cursor:ns-resize}.resize.n{top:-4px}.resize.s{bottom:-4px}.resize.ne,.resize.nw,.resize.se,.resize.sw{width:18px;height:18px;z-index:6}.resize.ne{right:-4px;top:-4px;cursor:nesw-resize}.resize.nw{left:-4px;top:-4px;cursor:nwse-resize}.resize.se{right:-4px;bottom:-4px;cursor:nwse-resize}.resize.sw{left:-4px;bottom:-4px;cursor:nesw-resize}.ghost{position:fixed;z-index:2147483645;border:2px solid #70c5ff;background:#55aeef33;border-radius:10px;pointer-events:none;display:none;transition:all .18s}.wi.collapsed .tabs,.wi.collapsed .toolbar,.wi.collapsed .content,.wi.collapsed .status,.wi.collapsed .resize{display:none}.wi.collapsed{height:44px!important;min-height:44px!important;border-radius:10px}.wi.dock-left,.wi.dock-right{border-radius:0}.wi.dock-top,.wi.dock-bottom{border-radius:0}.wi.dock-top .title{order:2;border-top:1px solid var(--line);border-bottom:0}.wi.dock-top .tabs{order:0}.wi.dock-top .toolbar{order:1}.wi.dock-top .content{order:0}.wi.dock-bottom .title{order:0}.wi.dock-bottom .tabs{order:1}.wi.dock-bottom .toolbar{order:2}.wi.dock-bottom .content{order:3}/* Geometry already anchors vertical docks; translating during the height animation hides the title. */.wi.dock-top.collapsed,.wi.dock-bottom.collapsed{transform:none}.wi.dock-left.collapsed{transform:translateX(calc(-100% + 54px))}.wi.dock-right.collapsed{transform:translateX(calc(100% - 54px))}.wi.dock-left.collapsed .title [data-action="collapse"]{order:1}.wi.dock-right.collapsed .title [data-action="collapse"]{order:-1}.dialog{position:absolute;z-index:10;inset:0;background:#0009;display:grid;place-items:center;padding:16px}.dialogbox{width:min(440px,100%);max-height:90%;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;box-shadow:0 15px 55px #000b}.dialogbox h3{margin:0 0 10px}.dialogbox .actions{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}.footerhint{font-size:11px;color:var(--muted)}
+      button{font:inherit;color:inherit;border:1px solid transparent;background:transparent;border-radius:7px;min-width:36px;height:34px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 8px}button:hover{background:#ffffff12;border-color:#ffffff14}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}.icon{font-size:16px;line-height:1}.title button{width:38px;height:38px;font-size:18px}.close:hover{background:#9f3942}.tabs{display:flex;gap:4px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow:auto;scrollbar-width:thin}.tab{white-space:nowrap;color:var(--muted);padding:5px 11px}.tab[aria-selected="true"]{color:var(--text);background:#2d4056;border-color:#47607c}.toolbar{display:flex;align-items:center;gap:4px;min-height:42px;padding:4px 8px;background:#141a23;border-bottom:1px solid var(--line);overflow:auto}.toolbar .spacer{flex:1}.toolbar button{min-width:36px}.content{position:relative;display:flex;flex:1;min-height:0;overflow:hidden}.panel{display:none;flex:1;min-height:0;min-width:0}.panel.active{display:flex}.columns{display:flex;flex:1;min-width:0;min-height:0}.treepane{width:42%;min-width:115px;display:flex;flex-direction:column;min-height:0}.detailpane{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}.subhead{padding:6px 9px;color:var(--muted);font-size:11px;letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}.tree,.scroll{overflow:auto;overscroll-behavior:contain;min-height:0;flex:1;padding:6px}.tree{display:grid;grid-template-columns:minmax(max-content,1fr);align-content:start}.tree-row{box-sizing:border-box;height:auto;min-height:25px;display:flex;align-items:center;gap:4px;padding:2px 5px;border-radius:5px;white-space:nowrap;cursor:pointer;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.tree-row:hover{background:#ffffff0a}.tree-row.selected{background:#23507a;color:#fff}.tree-row .twisty{width:18px;min-width:18px;height:22px;padding:0;color:var(--muted)}.tree-row .twisty,.tree-row .tag{flex-shrink:0}.tree-more{justify-self:start;height:28px;margin:4px 2px;color:var(--accent);font-size:12px;border-color:var(--line)}.tree-row .tag{color:#7ec8ff}.tree-row .meta{color:#b3becb}.muted{color:var(--muted)}.empty{padding:18px;color:var(--muted);text-align:center}.field{width:100%;background:#0d1118;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:7px 8px;font:inherit}.field.small{padding:5px 7px}.field,textarea,select{font-size:14px}.editor{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical;min-height:60px;max-height:35%;tab-size:2}.label{font-size:11px;color:var(--muted);margin:9px 0 4px}.detail-actions{display:flex;gap:5px;flex-wrap:wrap;padding:7px;border-bottom:1px solid var(--line)}.htmlview,.sourceview{margin:0;white-space:pre;overflow:auto;flex:1;padding:10px;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;tab-size:2;color:#d7e2ef}.tok-tag{color:#76c7ff}.tok-attr{color:#c6a0f6}.tok-str{color:#a7dc8b}.tok-comment{color:#718096}.tok-text{color:#d7e2ef}.tok-key{color:#f0c674}.tok-num{color:#ef9f76}.tok-punc{color:#b9c5d3}.status{min-height:24px;padding:3px 9px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:center}.status .right{margin-left:auto}.consolepanel{flex-direction:column}.consolelog{flex:1;min-height:0;overflow:auto;padding:5px}.entry{padding:5px 8px;border-bottom:1px solid #ffffff0b;white-space:pre-wrap;overflow-wrap:anywhere}.entry.warn{background:#7d5b1b22}.entry.error{background:#842d3828}.entry.debug{color:#b1a5cf}.entry .stamp{color:#8594a7;font-size:10px;margin-right:7px}.entry .kind{font-weight:700;margin-right:6px}.command-area{border-top:1px solid var(--line);padding:7px;display:flex;gap:7px;align-items:flex-end}.command-area textarea{flex:1;min-height:40px;max-height:125px;resize:vertical;font:13px/1.4 ui-monospace,monospace}.resourcepanel{flex-direction:column}.resource-type{display:flex;padding:6px 8px;gap:4px;border-bottom:1px solid var(--line)}.resource-type button[aria-pressed="true"]{background:#2d4056}.reslist{flex:1;min-height:0;overflow:auto}.resrow{display:grid;grid-template-columns:minmax(90px,1fr) minmax(80px,2fr);gap:8px;padding:7px 9px;border-bottom:1px solid #ffffff0a;cursor:pointer}.resrow:hover{background:#ffffff0a}.resrow.selected{background:#23507a}.reskey,.resvalue{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.reskey{font:12px ui-monospace,monospace;color:#a9d5ff}.resvalue{color:var(--muted)}.filterbox{width:150px}.sourcepanel{flex-direction:column}.sourcebar{display:flex;align-items:center;gap:7px;padding:5px 8px;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted)}.sourceview{flex:1}.sourcebar button[aria-pressed="true"]{background:#2d4056;border-color:#47607c}.menu{position:absolute;z-index:9;width:250px;max-width:calc(100% - 16px);display:flex;flex-direction:column;gap:2px;padding:4px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px #000a}.menu button{height:auto;flex-direction:column;align-items:flex-start;gap:1px;padding:7px 10px;text-align:left}.menu .hint{font-size:11px;color:var(--muted)}.dialogbox.wide{width:min(640px,100%)}.dialogbox.wide .actions{position:sticky;bottom:-14px;margin:12px -14px -14px;padding:10px 14px;background:var(--panel);border-top:1px solid var(--line)}.urlgroup{margin-top:10px}.urlgroup-head{display:flex;align-items:center;gap:6px;font-weight:600;font-size:12px}.urllist{max-height:180px;overflow:auto;margin-top:4px;padding:3px;border:1px solid var(--line);border-radius:6px;background:#0d1118}.urlrow{display:flex;gap:6px;align-items:flex-start;padding:2px 4px;font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}.urlrow input,.urlgroup-head input{margin:2px 0 0;flex:none}.urlinfo{color:var(--muted);font-size:10.5px}.urlnotes summary{cursor:pointer;font-weight:600;font-size:12px}.urlnotes .urlrow{color:var(--muted)}.exportprogress{margin-top:10px;font-size:12px;color:var(--muted);min-height:1.4em}.settingspanel{flex-direction:column}.settings{display:flex;flex-direction:column;gap:8px;padding:12px}.settings-head{margin:0 0 2px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}.setting{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer}.setting:hover{border-color:#47607c}.setting input{margin:3px 0 0;flex:none;width:16px;height:16px;accent-color:var(--accent)}.setting .hint{display:block;margin-top:3px;font-size:12px;color:var(--muted)}.splitter{flex:none;width:9px;margin-left:-4px;margin-right:-4px;z-index:2;cursor:col-resize;position:relative;touch-action:none;outline:none}.splitter::before{content:'';position:absolute;top:0;bottom:0;left:4px;width:1px;background:var(--line)}.splitter::after{content:'';position:absolute;left:2px;top:50%;width:5px;height:30px;margin-top:-15px;border-radius:3px;background:radial-gradient(circle,#7d8b9d 1.2px,transparent 1.6px) 0 0/5px 6px;opacity:.7}.splitter:hover::before,.splitter.dragging::before,.splitter:focus-visible::before{background:var(--accent);width:3px;left:3px}.splitter:hover::after,.splitter.dragging::after{opacity:1}.columns.stacked{flex-direction:column}.columns.stacked .treepane{width:auto;min-width:0;min-height:64px;flex:none}.columns.stacked .detailpane{min-height:0}.columns.stacked .splitter{width:auto;height:9px;margin:-4px 0;cursor:row-resize}.columns.stacked .splitter::before{top:4px;bottom:auto;left:0;right:0;width:auto;height:1px}.columns.stacked .splitter::after{left:50%;top:2px;width:30px;height:5px;margin:0 0 0 -15px;background-size:6px 5px}.columns.stacked .splitter:hover::before,.columns.stacked .splitter.dragging::before{height:3px;top:3px;width:auto;left:0}.columns.no-selection .splitter,.columns.no-selection .detailpane{display:none}.columns.no-selection .treepane{width:auto!important;height:auto!important;flex:1}.tree-hint{display:none;padding:7px 10px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted)}.columns.no-selection .tree-hint{display:block}.crumbbar{display:flex;align-items:center;min-height:32px;border-bottom:1px solid var(--line)}.crumbbar>button{flex:none;min-width:30px;height:28px;margin:0 4px;padding:0;color:var(--muted)}.crumbs{flex:1;min-width:0;display:flex;align-items:center;gap:2px;overflow-x:auto;white-space:nowrap;scrollbar-width:none;padding:0 6px;font:11.5px ui-monospace,SFMono-Regular,Menlo,monospace}.crumbs::-webkit-scrollbar{display:none}.crumb{flex:none;min-width:0;height:22px;padding:0 4px;border-radius:4px;color:#7ec8ff;font:inherit}.crumb:hover{text-decoration:underline}.crumb.current{display:inline-flex;align-items:center;background:#23507a;color:#fff;padding:0 6px}.crumbsep{color:var(--muted);flex:none}.dsection{border:1px solid var(--line);border-radius:8px;margin:0 0 8px;background:#141a23;overflow:hidden}.dsection-head{display:flex;align-items:center;justify-content:flex-start;gap:7px;width:100%;height:32px;padding:0 10px;border:0;border-radius:0;font-size:12px;font-weight:600;background:#1a212c}.dsection-head .fa-icon{width:10px;height:10px;color:var(--muted)}.dsection-head .count{color:var(--muted);font-weight:400}.dsection-body{padding:6px 8px 8px}.dsection.collapsed .dsection-body{display:none}.attrtable{width:100%;border-collapse:collapse;table-layout:fixed;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.attrtable th{text-align:left;padding:3px 6px;font:600 11px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--muted);border-bottom:1px solid var(--line)}.attrtable th:first-child{width:36%}.attrtable th:last-child{width:32px}.attrtable td{padding:2px 1px;border-bottom:1px solid #ffffff0a;vertical-align:middle}.attrtable .cell{width:100%;min-width:0;background:transparent;border:1px solid transparent;border-radius:5px;padding:5px 6px;font:inherit;color:var(--text)}.attrtable .cell.name{color:#c6a0f6}.attrtable .cell.value{color:#a7dc8b}.attrtable .cell:hover{border-color:var(--line)}.attrtable .cell:focus{background:#0d1118;border-color:var(--accent);outline:none}.attrtable .cell.invalid{border-color:var(--red)}.rowdel{min-width:26px;width:26px;height:26px;padding:0;color:var(--muted);opacity:.55}.rowdel .fa-icon{width:10px;height:10px}.attrtable tr:hover .rowdel,.rowdel:focus-visible{opacity:1}.rowdel:hover{color:var(--red)}.addrow{display:flex;margin:6px auto 0;min-width:30px;width:30px;height:24px;padding:0;border:1px dashed var(--line);border-radius:6px;color:var(--muted)}.addrow .fa-icon{width:11px;height:11px}.addrow:hover{color:var(--text);border-color:var(--accent)}.textedit{display:block;resize:none;overflow:auto;min-height:34px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;tab-size:2;margin:2px 0 4px}.fieldhint{font-size:11px;color:var(--muted)}.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.notice{background:#573e14;color:#ffe1a3;padding:6px 9px;font-size:11px}.resize{position:absolute;z-index:5;touch-action:none}.resize.e,.resize.w{top:14px;bottom:14px;width:10px;cursor:ew-resize}.resize.e{right:-4px}.resize.w{left:-4px}.resize.n,.resize.s{height:10px;left:14px;right:14px;cursor:ns-resize}.resize.n{top:-4px}.resize.s{bottom:-4px}.resize.ne,.resize.nw,.resize.se,.resize.sw{width:18px;height:18px;z-index:6}.resize.ne{right:-4px;top:-4px;cursor:nesw-resize}.resize.nw{left:-4px;top:-4px;cursor:nwse-resize}.resize.se{right:-4px;bottom:-4px;cursor:nwse-resize}.resize.sw{left:-4px;bottom:-4px;cursor:nesw-resize}.ghost{position:fixed;z-index:2147483645;border:2px solid #70c5ff;background:#55aeef33;border-radius:10px;pointer-events:none;display:none;transition:all .18s}.wi.collapsed .tabs,.wi.collapsed .toolbar,.wi.collapsed .content,.wi.collapsed .status,.wi.collapsed .resize{display:none}.wi.collapsed{height:44px!important;min-height:44px!important;border-radius:10px}.wi.dock-left,.wi.dock-right{border-radius:0}.wi.dock-top,.wi.dock-bottom{border-radius:0}.wi.dock-top .title{order:2;border-top:1px solid var(--line);border-bottom:0}.wi.dock-top .tabs{order:0}.wi.dock-top .toolbar{order:1}.wi.dock-top .content{order:0}.wi.dock-bottom .title{order:0}.wi.dock-bottom .tabs{order:1}.wi.dock-bottom .toolbar{order:2}.wi.dock-bottom .content{order:3}/* Geometry already anchors vertical docks; translating during the height animation hides the title. */.wi.dock-top.collapsed,.wi.dock-bottom.collapsed{transform:none}.wi.dock-left.collapsed{transform:translateX(calc(-100% + 54px))}.wi.dock-right.collapsed{transform:translateX(calc(100% - 54px))}.wi.dock-left.collapsed .title [data-action="collapse"]{order:1}.wi.dock-right.collapsed .title [data-action="collapse"]{order:-1}.dialog{position:absolute;z-index:10;inset:0;background:#0009;display:grid;place-items:center;padding:16px}.dialogbox{width:min(440px,100%);max-height:90%;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;box-shadow:0 15px 55px #000b}.dialogbox h3{margin:0 0 10px}.dialogbox .actions{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}.footerhint{font-size:11px;color:var(--muted)}
       .fa-icon{display:inline-block;width:1em;height:1em;flex:none;fill:currentColor;pointer-events:none}
       .logo .fa-icon{width:14px;height:14px}.tree-row .twisty .fa-icon{width:10px;height:10px}.tree-row .twisty.leaf .fa-icon{width:4px;height:4px}
       .tree-row .hidden-indicator{color:var(--muted);margin-right:4px}
@@ -360,12 +365,12 @@
       .pickbox{z-index:2147483645;background:rgba(134,239,172,.38);outline:1px solid rgba(34,197,94,.65)}
       .selectionbox{z-index:2147483646;border:2px solid #31b954;border-radius:5px;animation:wi-selection-pulse 1.6s ease-in-out infinite}
       @keyframes wi-selection-pulse{0%,100%{border-color:#31b954;box-shadow:0 0 0 0 rgba(49,185,84,.45)}50%{border-color:#72e991;box-shadow:0 0 0 5px rgba(49,185,84,.16)}}
-      @media(max-width:600px){.wi{min-width:280px;border-radius:10px}.treepane{width:39%;min-width:100px}.context{display:none}.toolbar{min-height:40px}.toolbar button{min-width:38px}.tabs{gap:2px}.tab{padding:5px 8px}.resrow{grid-template-columns:minmax(75px,1fr) minmax(65px,1fr)}}
+      @media(max-width:600px){.wi{min-width:280px;border-radius:10px}.treepane{min-width:100px}.context{display:none}.toolbar{min-height:40px}.toolbar button{min-width:38px}.tabs{gap:2px}.tab{padding:5px 8px}.resrow{grid-template-columns:minmax(75px,1fr) minmax(65px,1fr)}}
       @media(prefers-reduced-motion:reduce){.wi,.ghost{transition:none!important}.selectionbox{animation:none;box-shadow:0 0 0 2px rgba(49,185,84,.2)}.locatebox{animation:none}}
     `;
 
     root.innerHTML = `<style>${css}</style>
-      <div class="wi" role="application" aria-label="Web Inspector">
+      <div class="wi" role="application" aria-label="Web Inspector" tabindex="-1">
         <div class="title" part="titlebar">
           <div class="brand"><span class="logo" aria-hidden="true">${faIcon('search')}</span><span class="titletext">Web Inspector</span><span class="context">this page</span></div>
           <button data-action="collapse" title="Collapse inspector" aria-label="Collapse inspector" aria-expanded="true">${faIcon('minus')}</button>
@@ -381,9 +386,10 @@
         <div class="toolbar" id="toolbar"></div>
         <main class="content">
           <section class="panel active" data-panel="elements"><div class="columns">
-            <div class="treepane"><div class="subhead">Document tree <span class="spacer"></span><button data-action="expand-all" title="Expand document tree" aria-label="Expand document tree">${faIcon('expand-tree')}</button></div><div class="tree" id="tree"></div></div>
-            <div class="detailpane"><div class="subhead" id="selected-label">No element selected</div><div class="detail-actions"><button data-action="pick" title="Click or drag to pick an element from the page" aria-label="Pick an element from the page">${faIcon('pick')}</button><button data-action="locate-element" title="Locate: scroll to the selected element and highlight it" aria-label="Locate selected element on the page">${faIcon('locate')}</button><button data-action="visibility" title="Toggle selected element visibility" aria-label="Toggle selected element visibility">${faIcon('eye')}</button><button data-action="delete-element" title="Delete selected element (Undo available)" aria-label="Delete selected element">${faIcon('trash')}</button><button data-action="add-element" title="Add an element" aria-label="Add an element">${faIcon('plus')}</button><button data-action="refresh-element" title="Refresh selected element" aria-label="Refresh selected element">${faIcon('refresh')}</button></div>
-              <div class="scroll" id="details"><div class="empty">Select an element in the tree or use Pick Target.</div></div>
+            <div class="treepane"><div class="subhead">Document tree <span class="spacer"></span><button data-action="expand-all" title="Expand document tree" aria-label="Expand document tree">${faIcon('expand-tree')}</button></div><div class="tree" id="tree"></div><div class="tree-hint">Select an element in the tree, or use Pick, to see its details here.</div></div>
+            <div class="splitter" role="separator" tabindex="0" aria-label="Resize the tree and details" aria-valuemin="15" aria-valuemax="85" title="Drag to resize · double-click to reset"></div>
+            <div class="detailpane"><div class="crumbbar"><nav class="crumbs" id="crumbs" aria-label="Element path"><span class="crumb current" id="selected-label">No element selected</span></nav><button data-action="close-details" title="Close details (Esc)" aria-label="Close details">${faIcon('close')}</button></div><div class="detail-actions"><button data-action="pick" title="Click or drag to pick an element from the page" aria-label="Pick an element from the page">${faIcon('pick')}</button><button data-action="locate-element" title="Locate: scroll to the selected element and highlight it" aria-label="Locate selected element on the page">${faIcon('locate')}</button><button data-action="visibility" title="Toggle selected element visibility" aria-label="Toggle selected element visibility">${faIcon('eye')}</button><button data-action="delete-element" title="Delete selected element (Undo available)" aria-label="Delete selected element">${faIcon('trash')}</button><button data-action="add-element" title="Add an element" aria-label="Add an element">${faIcon('plus')}</button><button data-action="refresh-element" title="Refresh selected element" aria-label="Refresh selected element">${faIcon('refresh')}</button></div>
+              <div class="scroll" id="details"></div>
             </div>
           </div></section>
           <section class="panel consolepanel" data-panel="console"><div class="notice">Page-context console capture is best-effort. Commands run in the page context only after you press Execute.</div><div class="consolelog" id="consolelog" aria-live="polite"></div><div class="command-area"><textarea class="field" id="command" placeholder="JavaScript command — Enter executes, Shift+Enter adds a line" aria-label="JavaScript command"></textarea><button data-action="execute" title="Execute command" aria-label="Execute command">${faIcon('play')}</button></div></section>
@@ -432,6 +438,7 @@
         collapsed: !!state.collapsed, closed: !!state.closed, activeTab: state.activeTab,
         theme: state.theme, lastResourceType: stateLocal.resourceType, opacity: !!state.opacity,
         rewriteUrls: !!state.rewriteUrls, rewriteScripts: !!state.rewriteScripts, stripQuery: !!state.stripQuery,
+        treeSplit: state.treeSplit, collapsedSections: [...state.collapsedSections],
       };
     }
     let lastSavedValues = JSON.stringify(preferenceValues());
@@ -510,7 +517,7 @@
     function renderSettings() { root.querySelectorAll('[data-setting]').forEach(box => { box.checked = !!state[box.dataset.setting]; }); }
     function buildToolbar() {
       const tab = state.activeTab;
-      if (tab === 'elements') toolbar.innerHTML = `<input class="field small" id="element-filter" style="width:min(230px,55vw)" placeholder="Search elements…" aria-label="Search elements"><button data-action="search-elements" title="Search elements" aria-label="Search elements">${faIcon('search')}</button><button data-action="search-next" title="Next search result" aria-label="Next result">${faIcon('down')}</button><button data-action="search-prev" title="Previous search result" aria-label="Previous result">${faIcon('up')}</button><span class="spacer"></span>${stateLocal.removed ? `<button data-action="undo-delete" title="Undo most recent deletion" aria-label="Undo deletion">${faIcon('undo')} Undo</button>` : ''}<button data-action="pick" title="Click or drag to pick a target on the page" aria-label="Pick target on page">${faIcon('pick')} Pick</button>`;
+      if (tab === 'elements') toolbar.innerHTML = `<input class="field small" id="element-filter" style="flex:1 1 150px;min-width:70px;max-width:230px" placeholder="Search elements…" aria-label="Search elements"><button data-action="search-elements" title="Search elements" aria-label="Search elements">${faIcon('search')}</button><button data-action="search-next" title="Next search result" aria-label="Next result">${faIcon('down')}</button><button data-action="search-prev" title="Previous search result" aria-label="Previous result">${faIcon('up')}</button><span class="spacer"></span>${stateLocal.removed ? `<button data-action="undo-delete" title="Undo most recent deletion" aria-label="Undo deletion">${faIcon('undo')} Undo</button>` : ''}<button data-action="pick" title="Click or drag to pick a target on the page" aria-label="Pick target on page">${faIcon('pick')} Pick</button>`;
       else if (tab === 'console') toolbar.innerHTML = `<span class="muted">Execution target: ${executionTarget === 'page' ? 'current page' : 'userscript context (page globals unavailable)'}</span><span class="spacer"></span><button data-action="clear-console" title="Clear console output" aria-label="Clear console output">Clear</button><button data-action="clear-history" title="Clear command history" aria-label="Clear command history">History</button>`;
       else if (tab === 'source') toolbar.innerHTML = `<span class="muted">Read-only representation</span><span class="spacer"></span><input class="field small" id="source-search" style="width:min(180px,45vw)" placeholder="Find in source" aria-label="Find in source"><button data-action="source-find" title="Find in source" aria-label="Find in source">${faIcon('search')}</button><button data-action="copy-source" title="Copy source" aria-label="Copy source">${faIcon('copy')} Copy</button>`;
       else if (tab === 'settings') toolbar.innerHTML = `<span class="muted">Inspector settings</span><span class="spacer"></span>`;
@@ -603,7 +610,8 @@
       stateLocal.selected = el;
       let p = el.parentElement;
       while (p && !excluded(p)) { stateLocal.expanded.add(p); p = p.parentElement; }
-      renderTree({ reveal: true }); revealSelectedRow(); renderDetails(); updateSelectionHighlight(); ensureHighlightLoop();
+      // Details first: opening the panel resizes the tree, which the reveal must see.
+      renderTree({ reveal: true }); renderDetails(); revealSelectedRow(); updateSelectionHighlight(); ensureHighlightLoop();
     }
     function revealSelectedRow() {
       const row = tree.querySelector('.tree-row.selected');
@@ -625,59 +633,215 @@
         return m;
       });
     }
+    // ---- Details panel: breadcrumb, collapsible sections, attribute table ----
+    const SECTIONS = [['attributes', 'Attributes'], ['text', 'Text content'], ['html', 'HTML preview']];
+    const ATTRIBUTE_NAME = /^[a-zA-Z_:][\w:.-]*$/;
+    function shortDescription(el) {
+      let s = el.localName || el.nodeName.toLowerCase();
+      if (el.id) s += `#${el.id}`; else if (el.classList?.length) s += `.${el.classList[0]}`;
+      return s;
+    }
+    function renderCrumbs(el) {
+      const crumbs = root.querySelector('#crumbs');
+      crumbs.replaceChildren();
+      const chain = [];
+      for (let p = el?.parentElement; p; p = p.parentElement) if (!excluded(p)) chain.unshift(p);
+      for (const ancestor of chain) {
+        const crumb = document.createElement('button'); crumb.className = 'crumb'; crumb.textContent = shortDescription(ancestor);
+        crumb.title = `Select ${elementDescription(ancestor)}`;
+        crumb.addEventListener('click', () => selectElement(ancestor));
+        const sep = document.createElement('span'); sep.className = 'crumbsep'; sep.setAttribute('aria-hidden', 'true'); sep.textContent = '›';
+        crumbs.append(crumb, sep);
+      }
+      const current = document.createElement('span'); current.id = 'selected-label'; current.className = 'crumb current';
+      current.textContent = el ? elementDescription(el) : 'No element selected';
+      current.setAttribute('aria-current', 'location');
+      crumbs.appendChild(current);
+      crumbs.scrollLeft = crumbs.scrollWidth;
+    }
+    function section(key, title) {
+      const box = document.createElement('section'); box.className = 'dsection'; box.dataset.section = key;
+      const collapsed = state.collapsedSections.includes(key);
+      box.classList.toggle('collapsed', collapsed);
+      const head = document.createElement('button'); head.className = 'dsection-head'; head.setAttribute('aria-expanded', String(!collapsed));
+      const label = document.createElement('span'); label.textContent = title;
+      const count = document.createElement('span'); count.className = 'count';
+      head.innerHTML = faIcon(collapsed ? 'chevron-right' : 'chevron-down');
+      head.append(label, count);
+      head.addEventListener('click', () => {
+        const nowCollapsed = !box.classList.contains('collapsed');
+        box.classList.toggle('collapsed', nowCollapsed); head.setAttribute('aria-expanded', String(!nowCollapsed));
+        head.firstElementChild.outerHTML = faIcon(nowCollapsed ? 'chevron-right' : 'chevron-down');
+        state.collapsedSections = SECTIONS.map(([k]) => k).filter(k => k === key ? nowCollapsed : state.collapsedSections.includes(k));
+        safeSave();
+      });
+      const body = document.createElement('div'); body.className = 'dsection-body';
+      box.append(head, body);
+      return { box, body, count };
+    }
+    function autosize(area) { area.style.height = 'auto'; area.style.height = `${Math.min(area.scrollHeight + 2, 260)}px`; }
     function renderDetails() {
       const el = stateLocal.selected;
-      const label = root.querySelector('#selected-label');
+      const columns = root.querySelector('.columns');
       details.replaceChildren();
-      if (!el || !el.isConnected) { stateLocal.selected = null; selectionHighlight.style.display = 'none'; label.textContent = 'No element selected'; details.innerHTML = '<div class="empty">Select an element in the tree or use Pick Target.</div>'; return; }
-      label.textContent = elementDescription(el);
-      const attrs = document.createElement('div'); attrs.className = 'scroll';
-      const title = document.createElement('div'); title.className = 'label'; title.textContent = 'Attributes (edit value, then Apply)'; attrs.appendChild(title);
-      for (const attr of [...el.attributes]) {
-        const row = document.createElement('div'); row.style.cssText = 'display:grid;grid-template-columns:minmax(70px,1fr) minmax(80px,2fr) auto;gap:5px;margin:4px 0';
-        const name = document.createElement('input'); name.className = 'field small'; name.value = attr.name; name.setAttribute('aria-label', `Attribute name ${attr.name}`);
-        const value = document.createElement('input'); value.className = 'field small'; value.value = attr.value; value.setAttribute('aria-label', `Attribute value ${attr.name}`);
-        const apply = document.createElement('button'); apply.textContent = 'Apply'; apply.title = `Apply ${attr.name}`;
-        apply.addEventListener('click', () => {
-          if (!stateLocal.selected?.isConnected) return setStatus('Selected element was removed');
-          const key = name.value.trim();
-          if (!/^[a-zA-Z_:][\w:.-]*$/.test(key)) return setStatus('Invalid attribute name');
-          try { if (key !== attr.name) el.removeAttribute(attr.name); el.setAttribute(key, value.value); setStatus(`Updated ${key}`); renderDetails(); } catch (e) { setStatus(`Could not update attribute: ${e.message}`); }
-        });
-        row.append(name, value, apply); attrs.appendChild(row);
+      if (!el || !el.isConnected) {
+        stateLocal.selected = null; selectionHighlight.style.display = 'none';
+        columns.classList.add('no-selection'); renderCrumbs(null); applySplit();
+        return;
       }
-      const addAttr = document.createElement('button'); addAttr.textContent = '+ Add attribute'; addAttr.addEventListener('click', () => {
-        const key = prompt('Attribute name'); if (!key) return;
-        if (!/^[a-zA-Z_:][\w:.-]*$/.test(key)) return setStatus('Invalid attribute name');
-        const value = prompt(`Value for ${key}`, '') ?? ''; el.setAttribute(key, value); renderDetails();
-      }); attrs.appendChild(addAttr);
-      const textLabel = document.createElement('div'); textLabel.className = 'label'; textLabel.textContent = 'Text content (explicitly apply)'; attrs.appendChild(textLabel);
-      // One editor per direct text node keeps each piece of text in its place
-      // between child elements. Whitespace-only formatting nodes are left alone.
+      columns.classList.remove('no-selection'); applySplit();
+      renderCrumbs(el);
+      let preview, attrCount;
+      // Edits apply in place without rebuilding the form, so focus is kept.
+      const afterEdit = message => {
+        renderTree(); renderCrumbs(el);
+        preview.innerHTML = highlightHTML(el.outerHTML.slice(0, 12000) + (el.outerHTML.length > 12000 ? '\n… truncated' : ''));
+        attrCount.textContent = `(${el.attributes.length})`;
+        if (message) setStatus(message);
+      };
+
+      // Attributes: an editable table; a change applies on Enter or when the field is left.
+      const attrs = section('attributes', 'Attributes'); attrCount = attrs.count;
+      const table = document.createElement('table'); table.className = 'attrtable';
+      table.innerHTML = '<thead><tr><th scope="col">Name</th><th scope="col">Value</th><th scope="col"><span class="visually-hidden">Remove</span></th></tr></thead><tbody></tbody>';
+      const tbody = table.tBodies[0];
+      const addRow = (initialName = '', initialValue = '') => {
+        let current = initialName || null;
+        const row = document.createElement('tr');
+        const name = document.createElement('input'); name.className = 'cell name'; name.value = initialName; name.placeholder = 'name'; name.spellcheck = false;
+        const value = document.createElement('input'); value.className = 'cell value'; value.value = initialValue; value.placeholder = 'value'; value.spellcheck = false;
+        const label = () => current || 'new attribute';
+        name.setAttribute('aria-label', `Attribute name ${label()}`); value.setAttribute('aria-label', `Attribute value ${label()}`);
+        const remove = document.createElement('button'); remove.className = 'rowdel'; remove.innerHTML = faIcon('close');
+        remove.title = 'Remove attribute'; remove.setAttribute('aria-label', `Remove attribute ${label()}`);
+        const cells = [name, value, remove].map(child => { const td = document.createElement('td'); td.appendChild(child); return td; });
+        row.append(...cells); tbody.appendChild(row);
+        const commitName = () => {
+          const key = name.value.trim();
+          name.classList.remove('invalid');
+          if (key === (current || '')) return;
+          if (!el.isConnected) return setStatus('Selected element was removed');
+          if (!key) { name.value = current || ''; return; }
+          if (!ATTRIBUTE_NAME.test(key)) { name.classList.add('invalid'); return setStatus(`Invalid attribute name: ${key}`); }
+          if (el.hasAttribute(key)) { name.classList.add('invalid'); return setStatus(`${key} already exists`); }
+          try { if (current) el.removeAttribute(current); el.setAttribute(key, value.value); }
+          catch (e) { name.classList.add('invalid'); return setStatus(`Could not set ${key}: ${e.message}`); }
+          const previous = current; current = key;
+          name.setAttribute('aria-label', `Attribute name ${key}`); value.setAttribute('aria-label', `Attribute value ${key}`); remove.setAttribute('aria-label', `Remove attribute ${key}`);
+          afterEdit(previous ? `Renamed ${previous} to ${key}` : `Added ${key}`);
+        };
+        const commitValue = () => {
+          if (!current) return; // applied once the row has a name
+          if (!el.isConnected) return setStatus('Selected element was removed');
+          if (el.getAttribute(current) === value.value) return;
+          try { el.setAttribute(current, value.value); afterEdit(`Updated ${current}`); } catch (e) { setStatus(`Could not update ${current}: ${e.message}`); }
+        };
+        name.addEventListener('change', commitName);
+        value.addEventListener('change', commitValue);
+        for (const [input, original] of [[name, () => current || ''], [value, () => (current && el.getAttribute(current)) ?? '']]) {
+          input.addEventListener('keydown', e => {
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); input.value = original(); input.classList.remove('invalid'); input.blur(); }
+          });
+        }
+        remove.addEventListener('click', () => {
+          if (current) { el.removeAttribute(current); afterEdit(`Removed ${current}`); }
+          row.remove();
+        });
+        return row;
+      };
+      for (const attr of [...el.attributes]) addRow(attr.name, attr.value);
+      const add = document.createElement('button'); add.className = 'addrow'; add.innerHTML = faIcon('plus');
+      add.title = 'Add an attribute'; add.setAttribute('aria-label', 'Add attribute');
+      add.addEventListener('click', () => addRow().querySelector('.cell.name').focus());
+      attrs.body.append(table, add);
+      attrCount.textContent = `(${el.attributes.length})`;
+
+      // Text content: one multiline editor per direct text node, so text between
+      // child elements stays in place. Applied when the field is left or with Ctrl/⌘+Enter.
+      const text = section('text', 'Text content');
       const segments = [...el.childNodes].filter(n => n.nodeType === Node.TEXT_NODE && n.nodeValue.trim());
-      const editors = (segments.length ? segments : [null]).map((node, index) => {
+      (segments.length ? segments : [null]).forEach((initialNode, index) => {
+        let node = initialNode;
         if (segments.length > 1) {
           const neighbour = node.previousElementSibling ? `after <${node.previousElementSibling.localName}>` : node.nextElementSibling ? `before <${node.nextElementSibling.localName}>` : '';
-          const sub = document.createElement('div'); sub.className = 'label'; sub.textContent = `Text ${index + 1} of ${segments.length}${neighbour ? ` (${neighbour})` : ''}`; attrs.appendChild(sub);
+          const sub = document.createElement('div'); sub.className = 'label'; sub.textContent = `Text ${index + 1} of ${segments.length}${neighbour ? ` (${neighbour})` : ''}`; text.body.appendChild(sub);
         }
-        const text = document.createElement('textarea'); text.className = 'field editor'; text.value = node ? node.nodeValue : '';
-        text.setAttribute('aria-label', segments.length > 1 ? `Direct text content ${index + 1}` : 'Direct text content'); attrs.appendChild(text);
-        return { node, text };
+        const area = document.createElement('textarea'); area.className = 'field textedit'; area.rows = 1; area.spellcheck = false;
+        area.value = node ? node.nodeValue : ''; area.placeholder = node ? '' : 'No direct text. Type to add some.';
+        area.setAttribute('aria-label', segments.length > 1 ? `Direct text content ${index + 1}` : 'Direct text content');
+        const commit = () => {
+          if (!el.isConnected) return setStatus('Selected element was removed');
+          if (node) {
+            if (!node.isConnected || node.parentNode !== el) return setStatus('Text changed on the page; refresh and try again');
+            if (node.nodeValue === area.value) return;
+            node.nodeValue = area.value;
+          } else {
+            if (!area.value) return;
+            node = el.insertBefore(document.createTextNode(area.value), el.firstChild);
+          }
+          afterEdit('Text updated');
+        };
+        area.addEventListener('input', () => autosize(area));
+        area.addEventListener('change', commit);
+        area.addEventListener('keydown', e => {
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commit(); }
+          else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); area.value = node ? node.nodeValue : ''; autosize(area); area.blur(); }
+        });
+        text.body.appendChild(area);
+        requestAnimationFrame(() => autosize(area));
       });
-      const applyText = document.createElement('button'); applyText.textContent = 'Apply text content'; applyText.addEventListener('click', () => {
-        if (!el.isConnected) return setStatus('Selected element was removed');
-        let changed = false;
-        for (const { node, text } of editors) {
-          if (node) { if (!node.isConnected || node.parentNode !== el) return setStatus('Text changed on the page; refresh and try again'); if (node.nodeValue !== text.value) { node.nodeValue = text.value; changed = true; } }
-          else if (text.value) { el.insertBefore(document.createTextNode(text.value), el.firstChild); changed = true; }
-        }
-        if (!changed) return setStatus('Text unchanged');
-        renderTree(); renderDetails(); setStatus('Text updated');
-      }); attrs.appendChild(applyText);
-      const htmlLabel = document.createElement('div'); htmlLabel.className = 'label'; htmlLabel.textContent = 'Current HTML (read-only preview)'; attrs.appendChild(htmlLabel);
-      const pre = document.createElement('pre'); pre.className = 'htmlview'; pre.style.cssText = 'max-height:180px;flex:none'; pre.innerHTML = highlightHTML(el.outerHTML.slice(0, 12000) + (el.outerHTML.length > 12000 ? '\n… truncated' : '')); attrs.appendChild(pre);
-      const copy = document.createElement('button'); copy.textContent = 'Copy HTML'; copy.addEventListener('click', () => copyText(el.outerHTML).then(() => setStatus('Element HTML copied'), () => setStatus('Clipboard access unavailable'))); attrs.appendChild(copy);
-      details.appendChild(attrs);
+      const hint = document.createElement('div'); hint.className = 'fieldhint'; hint.textContent = 'Saved when you leave the field, or with Ctrl/⌘+Enter. Esc undoes.';
+      text.body.appendChild(hint);
+      text.count.textContent = segments.length > 1 ? `(${segments.length} parts)` : '';
+
+      // HTML preview.
+      const html = section('html', 'HTML preview');
+      preview = document.createElement('pre'); preview.className = 'htmlview'; preview.style.cssText = 'max-height:180px;flex:none';
+      preview.innerHTML = highlightHTML(el.outerHTML.slice(0, 12000) + (el.outerHTML.length > 12000 ? '\n… truncated' : ''));
+      const copy = document.createElement('button'); copy.textContent = 'Copy HTML'; copy.addEventListener('click', () => copyText(el.outerHTML).then(() => setStatus('Element HTML copied'), () => setStatus('Clipboard access unavailable')));
+      html.body.append(preview, copy);
+
+      details.append(attrs.box, text.box, html.box);
+    }
+    function closeDetails() {
+      stopLocate();
+      stateLocal.selected = null;
+      renderTree(); renderDetails(); updateSelectionHighlight();
+      setStatus('Details closed');
+    }
+
+    // ---- Resizable split between the tree and the details ----
+    const DEFAULT_SPLIT = 0.42, MIN_SPLIT = 0.15, MAX_SPLIT = 0.85, STACK_BELOW = 520;
+    function applySplit() {
+      const columns = root.querySelector('.columns'), tree = root.querySelector('.treepane'), splitter = root.querySelector('.splitter');
+      const stacked = win.getBoundingClientRect().width < STACK_BELOW;
+      columns.classList.toggle('stacked', stacked);
+      splitter.setAttribute('aria-orientation', stacked ? 'horizontal' : 'vertical');
+      splitter.setAttribute('aria-valuenow', String(Math.round(state.treeSplit * 100)));
+      const size = columns.classList.contains('no-selection') ? '' : `${state.treeSplit * 100}%`;
+      tree.style.width = stacked ? '' : size;
+      tree.style.height = stacked ? size : '';
+    }
+    function setSplit(value, save = true) {
+      state.treeSplit = clamp(value, MIN_SPLIT, MAX_SPLIT);
+      applySplit();
+      if (save) safeSave();
+    }
+    function startSplitDrag(e) {
+      if (e.button !== undefined && e.button !== 0) return;
+      const splitter = e.currentTarget, columns = root.querySelector('.columns');
+      try { splitter.setPointerCapture(e.pointerId); } catch (_) {}
+      splitter.classList.add('dragging'); e.preventDefault();
+      const move = ev => {
+        const r = columns.getBoundingClientRect(), stacked = columns.classList.contains('stacked');
+        setSplit(stacked ? (ev.clientY - r.top) / r.height : (ev.clientX - r.left) / r.width, false);
+      };
+      const end = () => {
+        splitter.classList.remove('dragging');
+        splitter.removeEventListener('pointermove', move); splitter.removeEventListener('pointerup', end); splitter.removeEventListener('pointercancel', end);
+        safeSave();
+      };
+      splitter.addEventListener('pointermove', move); splitter.addEventListener('pointerup', end); splitter.addEventListener('pointercancel', end);
     }
     function toggleVisibility() {
       const el = stateLocal.selected;
@@ -1784,6 +1948,7 @@
       cachePreferences({ ...preferenceValues(), updatedAt: savedAt });
       updateTab(state.activeTab, false);
       renderSettings();
+      applySplit(); if (stateLocal.selected) renderDetails();
       applyGeometry();
       setInspectorClosed(state.closed, false);
     }
@@ -1804,6 +1969,7 @@
         case 'pick': startPicker();break;
         case 'visibility': toggleVisibility();break;
         case 'locate-element': locateElement();break;
+        case 'close-details': closeDetails();break;
         case 'delete-element': deleteElement();break;
         case 'add-element': addElementDialog();break;
         case 'refresh-element': renderDetails();renderTree();break;
@@ -1919,6 +2085,13 @@
       listen('.title','pointermove',moveDrag);listen('.title','pointerup',endDrag);listen('.title','pointercancel',endDrag);listen('.title','lostpointercapture',endDrag);
       root.querySelectorAll('[data-resize]').forEach(h=>{h.addEventListener('pointerdown',startResize);h.addEventListener('pointermove',moveResize);h.addEventListener('pointerup',endResize);h.addEventListener('pointercancel',endResize);});
       listen('#resource-filter','input',refreshResources);
+      const splitter=root.querySelector('.splitter');
+      listen(splitter,'pointerdown',startSplitDrag);
+      listen(splitter,'dblclick',()=>{setSplit(DEFAULT_SPLIT);setStatus('Panel sizes reset');});
+      listen(splitter,'keydown',e=>{const step={ArrowLeft:-0.02,ArrowUp:-0.02,ArrowRight:0.02,ArrowDown:0.02}[e.key];if(step){e.preventDefault();setSplit(state.treeSplit+step);}else if(e.key==='Home'||e.key==='End'){e.preventDefault();setSplit(e.key==='Home'?MIN_SPLIT:MAX_SPLIT);}});
+      // Esc closes the details, unless it is meant for a field, dialog or menu.
+      listen(root,'keydown',e=>{if(e.key!=='Escape'||e.defaultPrevented||stateLocal.picking||!stateLocal.selected||state.activeTab!=='elements')return;if(e.target.closest?.('input,textarea,select,.dialog,.menu'))return;e.preventDefault();closeDetails();});
+      if(typeof ResizeObserver==='function'){const observer=new ResizeObserver(()=>applySplit());observer.observe(win);stateLocal.listeners.push(()=>observer.disconnect());}
       listen(root,'change',e=>{const key=e.target?.dataset?.setting;if(!key)return;state[key]=e.target.checked;safeSave();setStatus(`${e.target.closest('.setting').querySelector('strong').textContent}: ${e.target.checked?'on':'off'}`);});
       listen('#command','keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();executeCommand();}else if(e.key==='ArrowUp'&&e.target.selectionStart===0){e.preventDefault();stateLocal.historyIndex=Math.max(0,stateLocal.historyIndex-1);e.target.value=stateLocal.commandHistory[stateLocal.historyIndex]||'';}else if(e.key==='ArrowDown'&&e.target.selectionStart===e.target.value.length){e.preventDefault();stateLocal.historyIndex=Math.min(stateLocal.commandHistory.length,stateLocal.historyIndex+1);e.target.value=stateLocal.commandHistory[stateLocal.historyIndex]||'';}});
       // The toolbar is rebuilt on every tab switch, so its inputs are handled by delegation.

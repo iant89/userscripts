@@ -82,7 +82,9 @@ async function inspectorState(page) {
 }
 
 async function pickButton(inspector, mobile = false) {
-  return mobile ? inspector.locator('.detail-actions [data-action="pick"]') : inspector.locator('#toolbar [data-action="pick"]');
+  // The toolbar's Pick stays visible on narrow screens; the details panel (with
+  // its own Pick) only appears once something is selected.
+  return inspector.locator('#toolbar [data-action="pick"]');
 }
 
 async function startDrag(page, inspector) {

@@ -149,6 +149,8 @@ test('Export opens a menu with Source and All files', async t => {
 test('All files lists the URLs in the source, grouped, with resources selected', async t => {
   const { inspector } = await sitePage(t);
   await inspector.locator('[data-action="export-all-files"]').click();
+  // The list is filled once the page's scripts and stylesheets have been scanned.
+  await inspector.locator('[data-export-start]:not([disabled])').waitFor();
   const group = kind => inspector.locator(`.urlgroup[data-kind="${kind}"] .urlrow`);
   const urls = async kind => (await group(kind).allTextContents()).sort();
   assert.deepEqual(await urls('resource'), [

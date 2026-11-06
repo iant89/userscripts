@@ -73,13 +73,13 @@ test('selecting an element scrolls its tree row into view', async t => {
 test('applying text content keeps text around child elements in place', async t => {
   const { page, inspector } = await fixture(t);
   await search(inspector, 'hello');
-  const apply = inspector.locator('button', { hasText: 'Apply text content' });
-  await apply.click();
+  // Leaving a field unchanged changes nothing.
+  await inspector.locator('textarea[aria-label="Direct text content 1"]').focus();
+  await inspector.locator('textarea[aria-label="Direct text content 1"]').blur();
   assert.equal(await page.locator('#mixed').evaluate(el => el.innerHTML), 'Hello <b>world</b> again');
-  assert.equal(await inspector.locator('#status-text').textContent(), 'Text unchanged');
   await inspector.locator('textarea[aria-label="Direct text content 1"]').fill('Hi ');
   await inspector.locator('textarea[aria-label="Direct text content 2"]').fill(' again!');
-  await apply.click();
+  await inspector.locator('textarea[aria-label="Direct text content 2"]').blur();
   assert.equal(await page.locator('#mixed').evaluate(el => el.innerHTML), 'Hi <b>world</b> again!');
 });
 
