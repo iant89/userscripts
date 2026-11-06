@@ -29,6 +29,8 @@ const icons = {
   'chevron-right': 'faChevronRight',
   circle: 'faCircle',
   undo: 'faRotateLeft',
+  beautify: 'faWandMagicSparkles',
+  download: 'faDownload',
 };
 
 const scriptPath = path.join(__dirname, '..', 'Web Inspector.user.js');
