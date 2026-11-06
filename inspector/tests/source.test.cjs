@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require('playwright');
+const { readZip } = require('./zip.cjs');
 
 const script = fs.readFileSync(path.join(__dirname, '..', 'Web Inspector.user.js'), 'utf8');
 let browser;
@@ -95,25 +96,6 @@ test('resource views export as their own file and cannot be beautified', async t
   assert.equal(download.suggestedFilename(), 'settings.json');
   assert.deepEqual(JSON.parse(fs.readFileSync(await download.path(), 'utf8')), { a: 1, b: [1, 2] });
 });
-
-// Read a stored ZIP (the format the inspector writes) and check each CRC.
-function readZip(buffer) {
-  const files = new Map();
-  const table = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
-  const crc = bytes => { let c = 0xFFFFFFFF; for (const b of bytes) c = table[(c ^ b) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
-  let at = 0;
-  while (buffer.readUInt32LE(at) === 0x04034b50) {
-    const size = buffer.readUInt32LE(at + 18), nameLength = buffer.readUInt16LE(at + 26), extra = buffer.readUInt16LE(at + 28);
-    const name = buffer.toString('utf8', at + 30, at + 30 + nameLength);
-    const data = buffer.subarray(at + 30 + nameLength + extra, at + 30 + nameLength + extra + size);
-    assert.equal(crc(data), buffer.readUInt32LE(at + 14), `CRC of ${name}`);
-    files.set(name, data.toString('utf8'));
-    at += 30 + nameLength + extra + size;
-  }
-  assert.equal(buffer.readUInt32LE(buffer.length - 22), 0x06054b50);
-  assert.equal(buffer.readUInt16LE(buffer.length - 12), files.size);
-  return files;
-}
 
 async function sitePage(t) {
   const context = await browser.newContext({ viewport: { width: 1000, height: 760 }, deviceScaleFactor: 1, acceptDownloads: true });
