@@ -7,7 +7,7 @@ A dependency-free, vanilla-JavaScript userscript that injects a floating inspect
 - Shadow-DOM UI, dark theme, persistent window geometry, floating drag/resize, four-edge snap previews/docking, collapse, hide/reopen, and viewport-aware placement.
 - Elements tree with selection, a page-target picker with green hover/selection highlights, attribute and text editing, visibility toggle, add element, delete with immediate Undo, and search.
 - Console output capture where the execution environment permits it, command history, and explicit command execution.
-- Reconstructed live-DOM source viewer with basic safe syntax coloring, source search, copy, and temporary JSON/text resource viewing.
+- Reconstructed live-DOM source viewer with basic safe syntax coloring, a Beautify toggle that indents the HTML, source search, copy, export to a file (`.html`, or `.json`/`.txt` for resource values), and temporary JSON/text resource viewing.
 - Local storage, session storage, and accessible document-cookie listing, filtering, refresh, copy, view, deletion, and confirmed clearing.
 - Saved window preferences across navigation, including between sites when userscript-manager storage is available. No external requests or runtime dependencies.
 
